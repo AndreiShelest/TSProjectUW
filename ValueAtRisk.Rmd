@@ -1,0 +1,69 @@
+---
+title: "Estimating Value-at-Risk of a Portfolio with GARCH-family ModelsS"
+author: "Andrei Shelest, Zofia Bracha"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: spacelab
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo    = TRUE, 
+                      cache   = TRUE,
+                      message = FALSE, 
+                      warning = FALSE)
+options(scipen = 10)
+```
+
+# Packages and data
+```{r cache = F}
+library(tidyverse)
+library(xts)
+library(fBasics)
+library(tseries)
+library(car)
+library(FinTS)
+library(rugarch) 
+library(quantmod)
+```
+
+# Financial instruments
+
+For the purposes of the project, the following instruments have been used.
+
+- Equity index: S&P500 (^SPX)
+- Company stock: Dell Technologies Inc. (DELL)
+- Currency pair: EUR/USD (EURUSD=X)
+- Brent Crude Oil (BZ=F)
+- Ethereum USD (ETH-USD)
+
+Data is downloaded from Yahoo Finance, for the period from 2019-01-01 to 2023-12-31.
+
+```{r}
+symbols = c("^SPX", "DELL", "EURUSD=X", "BZ=F", "ETH-USD")
+date_from = "2019-01-01"
+date_to = "2023-12-31"
+
+download_data = FALSE
+
+if(download_data){
+  for(symbol in symbols){
+    symbol_data = getSymbols(Symbols = symbol,             
+             from = date_from, 
+             to = date_to,   
+             auto.assign = FALSE)
+    symbol_adj = gsub("^\\^(.+)", "\\1", symbol)
+    adj_col_name = sprintf("%s.Adjusted", symbol_adj)
+
+    symbol_df = data.frame(Date=index(symbol_data), Adjusted=symbol_data[, adj_col_name])
+    names(symbol_df)[names(symbol_df)==adj_col_name] = "Adjusted"
+    
+    write.csv(symbol_df, sprintf("./data/%s.csv", symbol), row.names=FALSE)
+  }
+}
+```
