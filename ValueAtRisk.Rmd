@@ -108,6 +108,42 @@ plot_quotes(tickers_map[[tickers[1]]], "R", sprintf("%s differenced log returns"
 
 We observe huge volatility clustering around 2020 market crash and in 2022 during bearish market.
 
+### Dell
+
+```{r}
+plot_quotes(tickers_map[[tickers[2]]], "Adjusted", sprintf("%s Quotes", tickers[2]))
+plot_quotes(tickers_map[[tickers[2]]], "R", sprintf("%s differenced log returns", tickers[2]))
+```
+
+Here the 2020 volatility cluster is more pronounced than of 2022.
+
+### EUR/USD
+
+```{r}
+plot_quotes(tickers_map[[tickers[3]]], "Adjusted", sprintf("%s Quotes", tickers[3]))
+plot_quotes(tickers_map[[tickers[3]]], "R", sprintf("%s differenced log returns", tickers[3]))
+```
+
+For EUR/USD volatility cluster is visible for 2022.
+
+### Brent
+
+```{r}
+plot_quotes(tickers_map[[tickers[4]]], "Adjusted", sprintf("%s Quotes", tickers[4]))
+plot_quotes(tickers_map[[tickers[4]]], "R", sprintf("%s differenced log returns", tickers[4]))
+```
+
+For Brent Crude Oil volatility clustering is observed in 2020 in 2022. 
+
+### Ethereum
+
+```{r}
+plot_quotes(tickers_map[[tickers[5]]], "Adjusted", sprintf("%s Quotes", tickers[5]))
+plot_quotes(tickers_map[[tickers[5]]], "R", sprintf("%s differenced log returns", tickers[5]))
+```
+
+Not only does Ethereum have a volatility cluster around 2020 crash, but also it has volatility clustering in 2021, the era of meme stocks and coins. Obviously, it is even better visible on quotes chart.
+
 ## Portfolio
 
 ### Plots of the quotes and log returns.
