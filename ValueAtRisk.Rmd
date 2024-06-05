@@ -20,7 +20,6 @@ knitr::opts_chunk$set(echo    = TRUE,
 options(scipen = 10)
 ```
 
-# Packages and data
 ```{r cache = F}
 library(tidyverse)
 library(xts)
@@ -30,9 +29,10 @@ library(car)
 library(FinTS)
 library(rugarch) 
 library(quantmod)
+library(hash)
 ```
 
-# Financial instruments
+# Components of Portfolio
 
 For the purposes of the project, the following instruments have been used.
 
@@ -45,25 +45,96 @@ For the purposes of the project, the following instruments have been used.
 Data is downloaded from Yahoo Finance, for the period from 2019-01-01 to 2023-12-31.
 
 ```{r}
-symbols = c("^SPX", "DELL", "EURUSD=X", "BZ=F", "ETH-USD")
+tickers = c("^SPX", "DELL", "EURUSD=X", "BZ=F", "ETH-USD")
+
 date_from = "2019-01-01"
 date_to = "2023-12-31"
 
-download_data = FALSE
+download_data = TRUE
 
 if(download_data){
-  for(symbol in symbols){
-    symbol_data = getSymbols(Symbols = symbol,             
-             from = date_from, 
-             to = date_to,   
+  for(ticker in tickers){
+    ticker_data = getSymbols(Symbols = ticker,
+             from = date_from,
+             to = date_to,
              auto.assign = FALSE)
-    symbol_adj = gsub("^\\^(.+)", "\\1", symbol)
-    adj_col_name = sprintf("%s.Adjusted", symbol_adj)
-
-    symbol_df = data.frame(Date=index(symbol_data), Adjusted=symbol_data[, adj_col_name])
-    names(symbol_df)[names(symbol_df)==adj_col_name] = "Adjusted"
+    act_ticker = gsub("^\\^", "", ticker)
+    adj_ticker = sprintf("%s.Adjusted", act_ticker)
     
-    write.csv(symbol_df, sprintf("./data/%s.csv", symbol), row.names=FALSE)
+    ticker_df = data.frame(Date=index(ticker_data), Adjusted=ticker_data[, adj_ticker])
+    names(ticker_df)[2] = "Adjusted"
+
+    write.csv(ticker_df, sprintf("./data/%s.csv", ticker), row.names=FALSE)
   }
 }
 ```
+```{r}
+plot_quotes = function(df, quote_col, title){
+  df_xts = xts(df[, quote_col], order.by=df$Date)
+  plot(df_xts[,1],
+     main = title,
+     col = "red",
+     major.ticks = "years", 
+     grid.ticks.on = "years",
+     grid.ticks.lty = 3,
+     lwd = 2,
+     cex = 0.5) 
+}
+```
+
+## Separate Quotes and Returns
+
+
+
+
+```{r}
+tickers_map = hash()
+
+
+for(ticker in tickers){
+  ticker_df = read.csv(sprintf("./data/%s.csv", ticker), header=TRUE)
+  ticker_df$Date = as.Date(ticker_df$Date)
+  ticker_df$R = diff.xts(log(ticker_df$Adjusted))
+  
+  tickers_map[[ticker]] = ticker_df
+}
+```
+### S&P500
+
+```{r}
+plot_quotes(tickers_map[[tickers[1]]], "Adjusted", sprintf("%s Quotes", tickers[1]))
+plot_quotes(tickers_map[[tickers[1]]], "R", sprintf("%s differenced log returns", tickers[1]))
+```
+
+We observe huge volatility clustering around 2020 market crash and in 2022 during bearish market.
+
+## Portfolio
+
+### Plots of the quotes and log returns.
+
+### ACF plots for returns and square returns.
+
+```{r}
+plot_acfs = function(df, ticker){
+  acf(df$R, lag.max = 36, na.action = na.pass,
+     ylim = c(-0.2, 0.2), col = "darkblue", lwd = 4,
+     main = sprintf("ACF of %s returns", ticker))
+  acf(df$R^2, lag.max = 36, na.action = na.pass,
+     ylim = c(-0.1, 0.2), col = "darkblue", lwd = 4,
+     main = sprintf("ACF of %s squared returns", ticker))
+}
+```
+```{r}
+# plot_acfs(dell_df, "DELL")
+```
+
+<!-- Observations: -->
+
+<!-- - There are a couple of significant lags for plain returns, which suggests presence of autocorrelation in returns, but perhaps not a strong one. -->
+<!-- - There is a more pronounced autocorrelation of squared returns, hence we can confirm the presence of serial autocorrelation. -->
+
+### Formal Testing for ARCH effects
+
+#### Autocorrelation of Residuals
+
+#### Leptokurtosis
