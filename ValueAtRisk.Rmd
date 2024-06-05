@@ -93,24 +93,26 @@ plot_quotes = function(df, quote_col, title){
 tickers_map = hash()
 joined_returns = NULL
 
+lr_label = function(ticker){
+  return(sprintf("%s.r", ticker))
+}
+
 
 for(ticker in tickers){
   ticker_df = read.csv(sprintf("./data/%s.csv", ticker), header=TRUE)
   ticker_df$Date = as.Date(ticker_df$Date)
-  ticker_df$R = diff.xts(log(ticker_df$Adjusted))
+  
+  r_label = lr_label(ticker)
+  
+  ticker_df[[r_label]] = diff.xts(log(ticker_df$Adjusted)) # log return
   
   tickers_map[[ticker]] = ticker_df
   
   if(is.null(joined_returns)) {
-    joined_returns = ticker_df %>% 
-      select(Date, R) %>% 
-      rename({{ticker}}:= R)
+    joined_returns = ticker_df %>% select(Date, `r_label`)
   }
   else {
-    joined_returns = full_join(joined_returns, 
-                               ticker_df %>% 
-                               select(Date, R) %>%
-                               rename({{ticker}}:= R), by="Date")
+    joined_returns = full_join(joined_returns, ticker_df %>% select(Date, `r_label`))
   }
   
 }
@@ -121,7 +123,7 @@ joined_returns = joined_returns %>% arrange(Date)
 
 ```{r}
 plot_quotes(tickers_map[[tickers[1]]], "Adjusted", sprintf("%s Quotes", tickers[1]))
-plot_quotes(tickers_map[[tickers[1]]], "R", sprintf("%s differenced log returns", tickers[1]))
+plot_quotes(tickers_map[[tickers[1]]], lr_label(tickers[1]), sprintf("%s differenced log returns", tickers[1]))
 ```
 
 We observe huge volatility clustering around 2020 market crash and in 2022 during bearish market.
@@ -130,7 +132,7 @@ We observe huge volatility clustering around 2020 market crash and in 2022 durin
 
 ```{r}
 plot_quotes(tickers_map[[tickers[2]]], "Adjusted", sprintf("%s Quotes", tickers[2]))
-plot_quotes(tickers_map[[tickers[2]]], "R", sprintf("%s differenced log returns", tickers[2]))
+plot_quotes(tickers_map[[tickers[2]]], lr_label(tickers[2]), sprintf("%s differenced log returns", tickers[2]))
 ```
 
 Here the 2020 volatility cluster is more pronounced than of 2022.
@@ -139,7 +141,7 @@ Here the 2020 volatility cluster is more pronounced than of 2022.
 
 ```{r}
 plot_quotes(tickers_map[[tickers[3]]], "Adjusted", sprintf("%s Quotes", tickers[3]))
-plot_quotes(tickers_map[[tickers[3]]], "R", sprintf("%s differenced log returns", tickers[3]))
+plot_quotes(tickers_map[[tickers[3]]], lr_label(tickers[3]), sprintf("%s differenced log returns", tickers[3]))
 ```
 
 For EUR/USD volatility cluster is visible for 2022.
@@ -148,7 +150,7 @@ For EUR/USD volatility cluster is visible for 2022.
 
 ```{r}
 plot_quotes(tickers_map[[tickers[4]]], "Adjusted", sprintf("%s Quotes", tickers[4]))
-plot_quotes(tickers_map[[tickers[4]]], "R", sprintf("%s differenced log returns", tickers[4]))
+plot_quotes(tickers_map[[tickers[4]]], lr_label(tickers[4]), sprintf("%s differenced log returns", tickers[4]))
 ```
 
 For Brent Crude Oil volatility clustering is observed in 2020 in 2022. 
@@ -157,41 +159,60 @@ For Brent Crude Oil volatility clustering is observed in 2020 in 2022.
 
 ```{r}
 plot_quotes(tickers_map[[tickers[5]]], "Adjusted", sprintf("%s Quotes", tickers[5]))
-plot_quotes(tickers_map[[tickers[5]]], "R", sprintf("%s differenced log returns", tickers[5]))
+plot_quotes(tickers_map[[tickers[5]]], lr_label(tickers[5]), sprintf("%s differenced log returns", tickers[5]))
 ```
 
 Not only does Ethereum have a volatility cluster around 2020 crash, but also it has volatility clustering in 2021, the era of meme stocks and coins. Obviously, it is even better visible on quotes chart.
 
 ## Portfolio
 
-### Constructing Joint Dataset
+### Constructing Joint Log Returns
+
+We should consider empty values for weekends and bank holidays. Instruments are obviously present in the portfolio during non-trading days, the difference is that their quotes are frozen, which is the same as their daily return on non-trading days is zero. Hence, we are replacing empty return values for non-trading days with zeros.
+
 
 ```{r}
-
+joined_returns = joined_returns %>% slice(-1) %>% replace(is.na(.), 0)
 ```
 
-### Plots of the quotes and log returns.
+Now let's calculate the log return of portfolio ($w_i=w=1/N$, $R$ stands for arithmetic return, $r$ - for logarithmic return).
 
-### ACF plots for returns and square returns.
+$$
+ln \dfrac{\Pi_{t+1}}{\Pi_{t}} = ln\dfrac{\sum_{i=1}^{N}S_{i,t+1}}{\Pi_t}=ln\dfrac{1/N\,\sum_{i=1}^{N}\Pi_{t}R_{i,t}}{\Pi_t} = ln \dfrac{1}{N}\sum_{i=1}^{N}R_{i,t} = ln \dfrac{1}{N}\sum_{i=1}^{N}e^{r_{i,t}}
+$$
 
 ```{r}
-plot_acfs = function(df, ticker){
-  acf(df$R, lag.max = 36, na.action = na.pass,
-     ylim = c(-0.2, 0.2), col = "darkblue", lwd = 4,
-     main = sprintf("ACF of %s returns", ticker))
-  acf(df$R^2, lag.max = 36, na.action = na.pass,
-     ylim = c(-0.1, 0.2), col = "darkblue", lwd = 4,
-     main = sprintf("ACF of %s squared returns", ticker))
+ret_sum = numeric(length(joined_returns))
+
+for(ticker in tickers){
+  ret_sum = ret_sum + exp(joined_returns[, lr_label(ticker)])
 }
+
+joined_returns$Portfolio = log(1/length(tickers) * ret_sum)
 ```
+
+### Plots of the log returns.
 ```{r}
-# plot_acfs(dell_df, "DELL")
+plot_quotes(joined_returns, "Portfolio", sprintf("%s differenced log returns", "Portfolio"))
 ```
 
-<!-- Observations: -->
+There is a clear volatility cluster at the beginning of 2020, as well as smaller clusters in the middle of 2021 and 2022.
 
-<!-- - There are a couple of significant lags for plain returns, which suggests presence of autocorrelation in returns, but perhaps not a strong one. -->
-<!-- - There is a more pronounced autocorrelation of squared returns, hence we can confirm the presence of serial autocorrelation. -->
+### ACF plots for log returns and square log returns.
+
+```{r}
+acf(joined_returns$Portfolio, lag.max = 36, na.action = na.pass,
+   ylim = c(-0.2, 0.2), col = "darkblue", lwd = 4,
+   main = "ACF of portfolio returns")
+acf(joined_returns$Portfolio^2, lag.max = 36, na.action = na.pass,
+   ylim = c(-0.2, 0.4), col = "darkblue", lwd = 4,
+   main = "ACF of portfolio squared returns")
+```
+
+Observations:
+
+- There are a couple of lags for plain log returns, but they are not very pronounced and on the verge of insignificance.
+- On the other hand, there are significant ACF values for lags for squared log returns, hence we can assume the presence of serial autocorrelation.
 
 ### Formal Testing for ARCH effects
 
