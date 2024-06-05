@@ -45,18 +45,22 @@ For the purposes of the project, the following instruments have been used.
 Data is downloaded from Yahoo Finance, for the period from 2019-01-01 to 2023-12-31.
 
 ```{r}
-tickers = c("^SPX", "DELL", "EURUSD=X", "BZ=F", "ETH-USD")
+tickers = c("^SPX", "DELL", "EURUSD", "BZ=F", "ETH-USD")
 
 date_from = "2019-01-01"
 date_to = "2023-12-31"
 
-download_data = TRUE
+download_data = FALSE
 
 if(download_data){
   for(ticker in tickers){
+    if(ticker == "EURUSD") {
+      next # downloaded from stooq instead, because of apparent incorrect dates in yahoo for EUR/USD
+    }
     ticker_data = getSymbols(Symbols = ticker,
              from = date_from,
              to = date_to,
+             src="yahoo",
              auto.assign = FALSE)
     act_ticker = gsub("^\\^", "", ticker)
     adj_ticker = sprintf("%s.Adjusted", act_ticker)
@@ -82,13 +86,12 @@ plot_quotes = function(df, quote_col, title){
 }
 ```
 
-## Separate Quotes and Returns
-
-
+## Quotes and Returns
 
 
 ```{r}
 tickers_map = hash()
+joined_returns = NULL
 
 
 for(ticker in tickers){
@@ -97,7 +100,22 @@ for(ticker in tickers){
   ticker_df$R = diff.xts(log(ticker_df$Adjusted))
   
   tickers_map[[ticker]] = ticker_df
+  
+  if(is.null(joined_returns)) {
+    joined_returns = ticker_df %>% 
+      select(Date, R) %>% 
+      rename({{ticker}}:= R)
+  }
+  else {
+    joined_returns = full_join(joined_returns, 
+                               ticker_df %>% 
+                               select(Date, R) %>%
+                               rename({{ticker}}:= R), by="Date")
+  }
+  
 }
+
+joined_returns = joined_returns %>% arrange(Date)
 ```
 ### S&P500
 
@@ -145,6 +163,12 @@ plot_quotes(tickers_map[[tickers[5]]], "R", sprintf("%s differenced log returns"
 Not only does Ethereum have a volatility cluster around 2020 crash, but also it has volatility clustering in 2021, the era of meme stocks and coins. Obviously, it is even better visible on quotes chart.
 
 ## Portfolio
+
+### Constructing Joint Dataset
+
+```{r}
+
+```
 
 ### Plots of the quotes and log returns.
 
