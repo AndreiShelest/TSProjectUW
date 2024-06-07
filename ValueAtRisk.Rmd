@@ -20,7 +20,6 @@ knitr::opts_chunk$set(echo    = TRUE,
 options(scipen = 10)
 ```
 
-# Packages and data
 ```{r cache = F}
 library(tidyverse)
 library(xts)
@@ -30,9 +29,10 @@ library(car)
 library(FinTS)
 library(rugarch) 
 library(quantmod)
+library(hash)
 ```
 
-# Financial instruments
+# Components of Portfolio
 
 For the purposes of the project, the following instruments have been used.
 
@@ -45,25 +45,232 @@ For the purposes of the project, the following instruments have been used.
 Data is downloaded from Yahoo Finance, for the period from 2019-01-01 to 2023-12-31.
 
 ```{r}
-symbols = c("^SPX", "DELL", "EURUSD=X", "BZ=F", "ETH-USD")
-date_from = "2019-01-01"
-date_to = "2023-12-31"
+tickers <- c("^SPX", "DELL", "EURUSD", "BZ=F", "ETH-USD")
 
-download_data = FALSE
+date_from <- "2019-01-01"
+date_to <- "2023-12-31"
+
+download_data <- FALSE
 
 if(download_data){
-  for(symbol in symbols){
-    symbol_data = getSymbols(Symbols = symbol,             
-             from = date_from, 
-             to = date_to,   
+  for(ticker in tickers){
+    if(ticker == "EURUSD") {
+      next # downloaded from stooq instead, because of apparent incorrect dates in yahoo for EUR/USD
+    }
+    ticker_data <- getSymbols(Symbols = ticker,
+             from = date_from,
+             to = date_to,
+             src="yahoo",
              auto.assign = FALSE)
-    symbol_adj = gsub("^\\^(.+)", "\\1", symbol)
-    adj_col_name = sprintf("%s.Adjusted", symbol_adj)
-
-    symbol_df = data.frame(Date=index(symbol_data), Adjusted=symbol_data[, adj_col_name])
-    names(symbol_df)[names(symbol_df)==adj_col_name] = "Adjusted"
+    act_ticker <- gsub("^\\^", "", ticker)
+    adj_ticker <- sprintf("%s.Adjusted", act_ticker)
     
-    write.csv(symbol_df, sprintf("./data/%s.csv", symbol), row.names=FALSE)
+    ticker_df <- data.frame(Date=index(ticker_data), Adjusted=ticker_data[, adj_ticker])
+    names(ticker_df)[2] <- "Adjusted"
+
+    write.csv(ticker_df, sprintf("./data/%s.csv", ticker), row.names=FALSE)
   }
 }
 ```
+```{r}
+plot_quotes = function(df, quote_col, title){
+  df_xts <- xts(df[, quote_col], order.by=df$Date)
+  plot(df_xts[,1],
+     main = title,
+     col = "red",
+     major.ticks = "years", 
+     grid.ticks.on = "years",
+     grid.ticks.lty = 3,
+     lwd = 2,
+     cex = 0.5) 
+}
+```
+
+## Quotes and Returns
+
+
+```{r}
+tickers_map = hash()
+joined_returns = NULL
+
+lr_label = function(ticker){
+  return(sprintf("%s.r", ticker))
+}
+
+
+for(ticker in tickers){
+  ticker_df <- read.csv(sprintf("./data/%s.csv", ticker), header=TRUE)
+  ticker_df$Date <- as.Date(ticker_df$Date)
+  
+  r_label <- lr_label(ticker)
+  
+  ticker_df[[r_label]] <- diff.xts(log(ticker_df$Adjusted)) # log return
+  
+  tickers_map[[ticker]] <- ticker_df
+  
+  if(is.null(joined_returns)) {
+    joined_returns <- ticker_df %>% select(Date, `r_label`)
+  }
+  else {
+    joined_returns <- full_join(joined_returns, ticker_df %>% select(Date, `r_label`))
+  }
+  
+}
+
+joined_returns <- joined_returns %>% arrange(Date)
+```
+### S&P500
+
+```{r}
+plot_quotes(tickers_map[[tickers[1]]], "Adjusted", sprintf("%s Quotes", tickers[1]))
+plot_quotes(tickers_map[[tickers[1]]], lr_label(tickers[1]), sprintf("%s differenced log returns", tickers[1]))
+```
+
+We observe huge volatility clustering around 2020 market crash and in 2022 during bearish market.
+
+### Dell
+
+```{r}
+plot_quotes(tickers_map[[tickers[2]]], "Adjusted", sprintf("%s Quotes", tickers[2]))
+plot_quotes(tickers_map[[tickers[2]]], lr_label(tickers[2]), sprintf("%s differenced log returns", tickers[2]))
+```
+
+Here the 2020 volatility cluster is more pronounced than of 2022.
+
+### EUR/USD
+
+```{r}
+plot_quotes(tickers_map[[tickers[3]]], "Adjusted", sprintf("%s Quotes", tickers[3]))
+plot_quotes(tickers_map[[tickers[3]]], lr_label(tickers[3]), sprintf("%s differenced log returns", tickers[3]))
+```
+
+For EUR/USD volatility cluster is visible for 2022.
+
+### Brent
+
+```{r}
+plot_quotes(tickers_map[[tickers[4]]], "Adjusted", sprintf("%s Quotes", tickers[4]))
+plot_quotes(tickers_map[[tickers[4]]], lr_label(tickers[4]), sprintf("%s differenced log returns", tickers[4]))
+```
+
+For Brent Crude Oil volatility clustering is observed in 2020 in 2022. 
+
+### Ethereum
+
+```{r}
+plot_quotes(tickers_map[[tickers[5]]], "Adjusted", sprintf("%s Quotes", tickers[5]))
+plot_quotes(tickers_map[[tickers[5]]], lr_label(tickers[5]), sprintf("%s differenced log returns", tickers[5]))
+```
+
+Not only does Ethereum have a volatility cluster around 2020 crash, but also it has volatility clustering in 2021, the era of meme stocks and coins. Obviously, it is even better visible on quotes chart.
+
+## Portfolio
+
+### Constructing Joint Log Returns
+
+Here the important decision is whether to trade or not to trade on weekends and bank holidays. Since only Ethereum is traded all the time, we decide to trade only on working days. The alternative option is to replace all non-trading day returns with zeros, but this solution will reduce the overall variance of returns.
+
+The list of non trading days was generated by ChatGPT-4o prompt "I need a list of weekend days and bank holidays for US since 2015 till 2025 in CSV file, column named Date, dates in format YYYY-mm-dd".
+
+```{r}
+non_trading_days <- read.csv("./data/non_trading_days.csv", header=TRUE)
+
+joined_returns <- joined_returns %>% filter(! Date %in% non_trading_days$Date) %>% slice(-1)
+print(sprintf("NAs left: %i", sum(is.na(joined_returns))))
+```
+
+The rest of the possible missing returns we are replacing with zeros.
+
+```{r}
+joined_returns <- joined_returns %>% replace(is.na(.), 0)
+```
+
+Now let's calculate the log-return of portfolio ($w_i=w=1/N$, $R$ stands for arithmetic return, $r$ - for logarithmic return).
+
+$$
+ln \dfrac{\Pi_{t+1}}{\Pi_{t}} = ln\dfrac{\sum_{i=1}^{N}S_{i,t+1}}{\Pi_t}=ln\dfrac{1/N\,\sum_{i=1}^{N}\Pi_{t}R_{i,t+1}}{\Pi_t} = ln \dfrac{1}{N}\sum_{i=1}^{N}R_{i,t+1} = ln \dfrac{1}{N}\sum_{i=1}^{N}e^{r_{i,t+1}}
+$$
+
+```{r}
+ret_sum <- numeric(length(joined_returns))
+
+for(ticker in tickers){
+  ret_sum <- ret_sum + exp(joined_returns[, lr_label(ticker)])
+}
+
+joined_returns$r <- log(1/length(tickers) * ret_sum)
+```
+
+```{r}
+head(joined_returns, n=10)
+```
+```{r}
+tail(joined_returns, n=10)
+```
+
+### Plots of the log-returns.
+```{r}
+plot_quotes(joined_returns, "r", "Portfolio differenced log returns")
+```
+
+There is a clear volatility cluster at the beginning of 2020, as well as smaller clusters in the middle of 2021 and 2022.
+
+### ACF plots for log returns and square log returns.
+
+```{r}
+acf(joined_returns$r, lag.max = 36, na.action = na.pass,
+   ylim = c(-0.2, 0.2), col = "darkblue", lwd = 4,
+   main = "ACF of portfolio returns")
+acf(joined_returns$r^2, lag.max = 36, na.action = na.pass,
+   ylim = c(-0.2, 0.4), col = "darkblue", lwd = 4,
+   main = "ACF of portfolio squared returns")
+```
+
+Observations:
+
+- There are a couple of lags for plain log-returns.
+- On the other hand, there are significant ACF values for lags for squared log-returns, hence we can assume the presence of serial autocorrelation.
+
+## Formal Testing for ARCH effects
+
+### Heteroscedasticity of Residuals
+
+```{r}
+ArchTest(joined_returns$r, lags=10)
+```
+LM test strongly rejects null hypothesis of homoscedasticity of log-returns and no autocorrelation of squared log-returns.
+
+```{r}
+Box.test(resid(lm(joined_returns$r ~ 1)), type = "Ljung-Box", lag = 10)
+```
+```{r}
+Box.test(resid(lm(joined_returns$r^2 ~ 1)), type = "Ljung-Box", lag = 10)
+```
+
+Ljung-Box test also strongly rejects the hypothesis of no autocorrelation both in simple and squared log-returns.
+
+### Leptokurtosis
+
+```{r}
+jarque.bera.test(joined_returns$r)
+```
+
+Based on Jarque-Bera test and its very small p-value, we strongly reject hypothesis of log-returns following normal distribution.
+
+```{r}
+basicStats(joined_returns$r)
+```
+
+The distribution of log-returns is left-skewed and has high kurtosis.
+
+```{r}
+hist(joined_returns$r, prob = TRUE, breaks = 50)
+curve(dnorm(x, mean = mean(joined_returns$r), sd  = sd(joined_returns$r)),
+            col = "darkblue", lwd = 3, add = TRUE)
+```
+
+We see more pronounced left tail and high kurtosis.
+
+The overall conclusion is that there are ARCH effects present in the log-returns of the portfolio.
+
+# Estimating GARCH models
