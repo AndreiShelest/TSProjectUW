@@ -3467,7 +3467,42 @@ insignificant lags estimation.</li>
 </div>
 <div id="model-selection" class="section level2">
 <h2>Model Selection</h2>
+<p>Since for most models LM and LB tests have not been able to reject
+null-hypothesis of no standardized simple/squared residuals
+autocorrelation, and the 3rd ACF lag for standardized squared residuals
+has not been removed fully by each model as well, we decide to choose
+among models which are the simplest and/or have the largest number of
+significant coefficient estimations.</p>
+<p>These models are ARMA(0,0)-GARCH(2,1), ARMA(0,0)-GARCH(3,3) and
+ARMA(5,5)-GARCH(2,1).</p>
+<div class="sourceCode" id="cb95"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb95-1"><a href="#cb95-1" tabindex="-1"></a><span class="fu">infocriteria</span>(arma00garch21)</span></code></pre></div>
+<pre><code>##                       
+## Akaike       -5.671155
+## Bayes        -5.650631
+## Shibata      -5.671186
+## Hannan-Quinn -5.663439</code></pre>
+<div class="sourceCode" id="cb97"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb97-1"><a href="#cb97-1" tabindex="-1"></a><span class="fu">infocriteria</span>(arma00garch33)</span></code></pre></div>
+<pre><code>##                       
+## Akaike       -5.668981
+## Bayes        -5.636143
+## Shibata      -5.669062
+## Hannan-Quinn -5.656636</code></pre>
+<div class="sourceCode" id="cb99"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb99-1"><a href="#cb99-1" tabindex="-1"></a><span class="fu">infocriteria</span>(arma55garch21)</span></code></pre></div>
+<pre><code>##                       
+## Akaike       -5.682314
+## Bayes        -5.620743
+## Shibata      -5.682598
+## Hannan-Quinn -5.659168</code></pre>
+<p>If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the
+second best AIC and best BIC, ARMA(0,0)-GARCH(3,3) has the second best
+BIC but worst AIC, and ARMA(5,5)-GARCH(2,1) has best AIC but worst BIC.
+Based on this, it seems that the simpler
+<strong>ARMA(0,0)-GARCH(2,1)</strong> is better, hence we will proceed
+with it.</p>
 </div>
+</div>
+<div id="futher-diagnostics" class="section level1">
+<h1>Futher Diagnostics</h1>
 </div>
 
 

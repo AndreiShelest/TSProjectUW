@@ -541,3 +541,16 @@ plot_conditional_sd(arma55garch35)
 
 ## Model Selection
 
+Since for most models LM and LB tests have not been able to reject null-hypothesis of no standardized simple/squared residuals autocorrelation, and the 3rd ACF lag for standardized squared residuals has not been removed fully by each model as well, we decide to choose among models which are the simplest and/or have the largest number of significant coefficient estimations.
+
+These models are ARMA(0,0)-GARCH(2,1), ARMA(0,0)-GARCH(3,3) and ARMA(5,5)-GARCH(2,1).
+
+```{r}
+infocriteria(arma00garch21)
+infocriteria(arma00garch33)
+infocriteria(arma55garch21)
+```
+
+If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the second best AIC and best BIC, ARMA(0,0)-GARCH(3,3) has the second best BIC but worst AIC, and ARMA(5,5)-GARCH(2,1) has best AIC but worst BIC. Based on this, it seems that the simpler **ARMA(0,0)-GARCH(2,1)** is better, hence we will proceed with it.
+
+# Futher Diagnostics
