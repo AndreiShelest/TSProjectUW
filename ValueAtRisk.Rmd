@@ -32,6 +32,8 @@ library(quantmod)
 library(hash)
 ```
 
+Everywhere here significance is assumed at p=0.05, if not said otherwise.
+
 # Components of Portfolio
 
 For the purposes of the project, the following instruments have been used.
@@ -274,3 +276,153 @@ We see more pronounced left tail and high kurtosis.
 The overall conclusion is that there are ARCH effects present in the log-returns of the portfolio.
 
 # Estimating GARCH models
+
+```{r}
+
+fit_garch = function(arma_p, arma_q, arch_q, garch_p){
+  spec <- ugarchspec(
+    variance.model = list(model = "sGARCH",
+                          garchOrder = c(arch_q, garch_p)),
+    mean.model = list(armaOrder = c(arma_p, arma_q), include.mean = T),
+    distribution.model = "norm")
+  model <- ugarchfit(spec=spec, data=joined_returns$r)
+  return(model)
+}
+
+# precompute simpler models
+model_list <- vector("list", length = 3*3*3*3)
+dim(model_list) <- c(3, 3, 3, 3)
+
+for(arma_p in 0:2){
+  for(arma_q in 0:2){
+    for (arch_q in 1:3){
+      for(garch_p in 1:3)
+      {
+        spec <- ugarchspec(
+          variance.model = list(model = "sGARCH",
+                                garchOrder = c(arch_q, garch_p)),
+          mean.model = list(armaOrder = c(arma_p, arma_q), include.mean = T),
+          distribution.model = "norm")
+        model <- ugarchfit(spec=spec, data=joined_returns$r)
+        model_list[[arma_p+1,arma_q+1,arch_q,garch_p]] <- fit_garch(arma_p, 
+                                                                    arma_q,
+                                                                    arch_q,
+                                                                    garch_p)
+      }
+    }
+  }
+}
+```
+
+### ARMA(0,0)-GARCH(1,1)
+
+Let's begin with the simplest option of a constant mean equation and ARCH and GARCH orders of 1.
+
+```{r}
+model_list[[1, 1, 1, 1]]
+```
+
+#### Comment
+
+The estimates or parameters are significant. Both Ljung-Box test for standardized squared residuals and LM tests say that we reject null-hypothesis of no autocorrelation of said residuals, hence the model is not adequate.
+
+### ARMA(0,0)-GARCH(2,1)
+
+```{r}
+model_list[[1, 1, 2, 1]]
+```
+
+#### Comment
+
+ARCH terms are not significant, but a single GARCH term is highly significant. Also, LB and LM tests for squared std. residuals do not allow us to reject autocorrelation absence. This might be a candidate model.
+
+### ARMA(0,0)-GARCH(1,2)
+
+```{r}
+model_list[[1, 1, 1, 2]]
+```
+
+#### Comment
+
+The added second GARCH term is strongly not significant, and information criteria are greater than for ARMA(0,0)-GARCH(2,1). LB and LM tests for standardized squared residuals do not allow us to reject autocorrelation absence. This might be a candidate model, but less preferred than ARMA(0,0)-GARCH(2,1).
+
+### ARMA(0,0)-GARCH(2,2)
+
+```{r}
+model_list[[1, 1, 2, 2]]
+```
+
+#### Comment
+
+Again, the added second GARCH term is insignificant, ARCH terms are insignificant, and LB and LM tests for standardized squared residuals do not allow us to reject autocorrelation absence. 
+
+### ARMA(0,0)-GARCH(3,3)
+
+```{r}
+model_list[[1, 1, 3, 3]]
+```
+
+#### Comment
+
+New 3rd order ARCH and GARCH terms are significant, and it has good LM and LB p-values. This model can also be a candidate for further investigation.
+
+Perhaps, now we should move to altering mean equation to see the effects.
+
+### ARMA(1,1)-GARCH(2,1)
+```{r}
+model_list[[2, 2, 2, 1]]
+```
+
+#### Comment
+
+The ARMA added lags are insignificant. LM and LB tests do not reject null-hypothesis of autocorrelation absence in standardized squared residuals.
+
+
+### ARMA(5,0)-GARCH(2,1)
+```{r}
+fit_garch(5, 0, 2, 1)
+```
+
+#### Comment
+
+Unfortunately, just adding AR(5) has all its terms insignificant.
+
+### ARMA(5,5)-GARCH(2, 1)
+```{r}
+fit_garch(5, 5, 2, 1)
+```
+
+#### Comment
+
+ARMA(5,5) parameters are significant, while ARCH(2) parameters are somewhat not, just like in simple ARMA(0,0)-GARCH(2,1) case. This model could be the candidate, especially with the purpose to compare it to simpler ARMA(0,0)-GARCH(2,1). 
+
+
+### ARMA(5,5)-GARCH(2, 2)
+```{r}
+fit_garch(5, 5, 2, 2)
+```
+
+#### Comment
+
+Interestingly, most of coefficients, except for beta2, are significant, and the model has better information criteria, but lower LM and LB p-values. This can also be a candidate.
+
+### ARMA(5,5)-GARCH(3, 3)
+```{r}
+fit_garch(5, 5, 3, 3)
+```
+
+#### Comment
+
+With addition of 3rd order lags the estimates have worse significance. Perhaps, we should not move further in increasing the amount of lags.
+
+
+## Candidate Models Further Investigation
+
+Based on the quick check of the models above, let's investigate these models in more detail:
+
+- ARMA(0,0)-GARCH(2,1)
+- ARMA(0,0)-GARCH(2,2)
+- ARMA(0,0)-GARCH(3,3)
+- ARMA(5,5)-GARCH(2,1)
+- ARMA(5,5)-GARCH(2,2)
+- ARMA(5,5)-GARCH(3,3)
