@@ -32,6 +32,10 @@ library(quantmod)
 library(hash)
 ```
 
+- Everywhere here significance is assumed at p=0.05, if not said otherwise.
+- LB - Ljung-Box test
+- LM - Lagrange multipliers test
+
 # Components of Portfolio
 
 For the purposes of the project, the following instruments have been used.
@@ -74,7 +78,13 @@ if(download_data){
 ```
 ```{r}
 plot_quotes = function(df, quote_col, title){
-  df_xts <- xts(df[, quote_col], order.by=df$Date)
+  if(has_name(df, "Date"))
+  {
+      df_xts <- xts(df[, quote_col], order.by=df$Date)
+  }
+  else{
+    df_xts <- xts(df[, quote_col], order.by=as.Date(rownames(df)))
+  }
   plot(df_xts[,1],
      main = title,
      col = "red",
@@ -182,7 +192,7 @@ print(sprintf("NAs left: %i", sum(is.na(joined_returns))))
 The rest of the possible missing returns we are replacing with zeros.
 
 ```{r}
-joined_returns <- joined_returns %>% replace(is.na(.), 0)
+joined_returns <- joined_returns %>% replace(is.na(.), 0) %>% column_to_rownames(., var = "Date")
 ```
 
 Now let's calculate the log-return of portfolio ($w_i=w=1/N$, $R$ stands for arithmetic return, $r$ - for logarithmic return).
@@ -218,12 +228,16 @@ There is a clear volatility cluster at the beginning of 2020, as well as smaller
 ### ACF plots for log returns and square log returns.
 
 ```{r}
-acf(joined_returns$r, lag.max = 36, na.action = na.pass,
-   ylim = c(-0.2, 0.2), col = "darkblue", lwd = 4,
-   main = "ACF of portfolio returns")
-acf(joined_returns$r^2, lag.max = 36, na.action = na.pass,
-   ylim = c(-0.2, 0.4), col = "darkblue", lwd = 4,
-   main = "ACF of portfolio squared returns")
+plot_acf = function(values, max_lim, title){
+  acf(values, lag.max = 36, na.action = na.pass,
+    ylim = c(-0.2, max_lim), col = "darkblue", lwd = 4,
+    main = title)
+}
+```
+
+```{r}
+plot_acf(joined_returns$r, 0.2, "ACF of portfolio log-returns")
+plot_acf(joined_returns$r^2, 0.4, "ACF of portfolio squared log-returns")
 ```
 
 Observations:
@@ -274,3 +288,269 @@ We see more pronounced left tail and high kurtosis.
 The overall conclusion is that there are ARCH effects present in the log-returns of the portfolio.
 
 # Estimating GARCH models
+
+```{r}
+fit_garch = function(arma_p, arma_q, arch_q, garch_p){
+  spec <- ugarchspec(
+    variance.model = list(model = "sGARCH",
+                          garchOrder = c(arch_q, garch_p)),
+    mean.model = list(armaOrder = c(arma_p, arma_q), include.mean = T),
+    distribution.model = "norm")
+  model <- ugarchfit(spec=spec, data=joined_returns$r)
+  return(model)
+}
+
+```
+
+### ARMA(0,0)-GARCH(1,1)
+
+Let's begin with the simplest option of a constant mean equation and ARCH and GARCH orders of 1.
+```{r}
+plot_std_residuals = function(fit_model){
+  plot(fit_model, which=10)
+}
+plot_std_sq_residuals = function(fit_model){
+  plot(fit_model, which=11)
+}
+plot_conditional_sd = function(fit_model){
+  plot(fit_model, which=3)
+}
+
+```
+```{r}
+arma00garch11 <- fit_garch(0, 0, 1, 1)
+arma00garch11
+```
+
+```{r}
+plot_std_residuals(arma00garch11)
+plot_std_sq_residuals(arma00garch11)
+plot_conditional_sd(arma00garch11)
+```
+
+#### Comment
+
+- All the estimates or parameters are significant. 
+- ACF of standardized residuals shows almost no autocorrelation
+- ACF of squared standardized residuals shows significant third lag.
+- Both Ljung-Box test for standardized squared residuals and LM tests say that we reject null-hypothesis of no autocorrelation of said residuals, hence the model is not adequate.
+
+### ARMA(0,0)-GARCH(2,1)
+
+```{r}
+arma00garch21 <- fit_garch(0, 0, 2, 1)
+arma00garch21
+```
+
+```{r}
+plot_std_residuals(arma00garch21)
+plot_std_sq_residuals(arma00garch21)
+plot_conditional_sd(arma00garch21)
+```
+
+#### Comment
+
+- ARCH(1) and ARCH(2) parameters are insignificant. 
+- ACF of standardized residuals shows almost no significant autocorrelation.
+- ACF of squared standardized residuals shows significant third lag. It is smaller than in ARCH(0,0)-GARCH(1,1).
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
+
+
+### ARMA(0,0)-GARCH(1,2)
+
+```{r}
+arma00garch12 <- fit_garch(0, 0, 1, 2)
+arma00garch12
+```
+```{r}
+plot_std_residuals(arma00garch12)
+plot_std_sq_residuals(arma00garch12)
+plot_conditional_sd(arma00garch12)
+```
+
+#### Comment
+
+- GARCH(2) is not significant. 
+- ACF of standardized residuals shows almost no autocorrelation.
+- ACF of squared standardized residuals shows significant third lag.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals (except for maybe LB 8th lag, but LM test shows no autocorrelation)
+
+
+### ARMA(0,0)-GARCH(2,2)
+
+```{r}
+arma00garch22 <- fit_garch(0, 0, 2, 2)
+arma00garch22
+```
+```{r}
+plot_std_residuals(arma00garch22)
+plot_std_sq_residuals(arma00garch22)
+plot_conditional_sd(arma00garch22)
+```
+
+#### Comment
+
+- ARCH(1), ARCH(2) and GARCH(2) parameters are not significant. 
+- ACF of standardized residuals shows almost no autocorrelation.
+- ACF of squared standardized residuals shows significant third lag.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
+
+
+### ARMA(0,0)-GARCH(3,3)
+
+```{r}
+arma00garch33 <- fit_garch(0, 0, 3, 3)
+arma00garch33
+```
+
+```{r}
+plot_std_residuals(arma00garch33)
+plot_std_sq_residuals(arma00garch33)
+plot_conditional_sd(arma00garch33)
+```
+
+#### Comment
+
+- ARCH(1) and GARCH(2) parameters are not significant. 
+- ACF of standardized residuals shows almost no autocorrelation.
+- ACF of squared standardized residuals shows significant third lag, but its magnitude is the lowest as of now.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
+
+Perhaps, now we should move to altering mean equation to see the effects.
+
+### ARMA(7,0)-GARCH(2,1)
+```{r}
+arma70garch21 <- fit_garch(7, 0, 2, 1)
+arma70garch21
+```
+
+```{r}
+plot_std_residuals(arma70garch21)
+plot_std_sq_residuals(arma70garch21)
+plot_conditional_sd(arma70garch21)
+```
+
+#### Comment
+
+- All AR lags except for the 7th are insignificant. ARCH(2) is also insignificant.
+- ACF of standardized residuals shows no autocorrelation.
+- ACF of squared standardized residuals shows significant third lag, as in all previous cases.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
+
+
+### ARMA(7,7)-GARCH(2,1)
+```{r}
+arma77garch21 <- fit_garch(7, 7, 2, 1)
+arma77garch21
+```
+```{r}
+plot_std_residuals(arma77garch21)
+plot_std_sq_residuals(arma77garch21)
+plot_conditional_sd(arma77garch21)
+```
+
+#### Comment
+
+- AR(2), AR(4), AR(7), MA(2), MA(4), MA(7) lags are insignificant, as well as ARCH(2). 
+- ACF of standardized residuals confidently shows no autocorrelation.
+- ACF of squared standardized residuals shows significant third lag, as in all previous cases.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
+
+
+Let's try reducing amount of ARMA lags.
+
+### ARMA(5,5)-GARCH(2,1)
+```{r}
+arma55garch21 <- fit_garch(5, 5, 2, 1)
+arma55garch21
+```
+```{r}
+plot_std_residuals(arma55garch21)
+plot_std_sq_residuals(arma55garch21)
+plot_conditional_sd(arma55garch21)
+```
+
+#### Comment
+
+- Only ARCH(2) is insignificant. 
+- ACF of standardized residuals shows one significant lag.
+- ACF of squared standardized residuals shows significant third lag, as in all previous cases.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
+
+Let's try adding more GARCH components.
+
+### ARMA(5,5)-GARCH(2,2)
+```{r}
+arma55garch22 <- fit_garch(5, 5, 2, 2)
+arma55garch22
+```
+```{r}
+plot_std_residuals(arma55garch22)
+plot_std_sq_residuals(arma55garch22)
+plot_conditional_sd(arma55garch22)
+```
+
+#### Comment
+
+- Again, only ARCH(2) is insignificant. 
+- ACF of standardized residuals showed significant 9th lag.
+- ACF of squared standardized residuals shows significant third lag and 14th.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. Nevertheless, ACF plots are not great, and we can conclude that this model is not that good.
+
+### ARMA(5,5)-GARCH(3,3)
+```{r}
+arma55garch33 <- fit_garch(5, 5, 3, 3)
+arma55garch33
+```
+```{r}
+plot_std_residuals(arma55garch33)
+plot_std_sq_residuals(arma55garch33)
+plot_conditional_sd(arma55garch33)
+```
+
+
+#### Comment
+
+
+- More lags are insignificant: AR(2), AR(3), MA(2), MA(3), ARCH(1), ARCH(2), GARCH(1), GARCH(2). 
+- ACF of standardized residuals showed significant 9th lag.
+- ACF of squared standardized residuals shows significant third lag and 14th.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. Nevertheless, the p-values are somewhat underwhelming, and together with ACF plots we can conclude that this model is not that good.
+
+Overall performance is not improving: more insignificant lags are appearing, and ACF plots are worsening.
+
+### ARMA(5,5)-GARCH(3,5)
+```{r}
+arma55garch35 <- fit_garch(5, 5, 3, 5)
+arma55garch35
+```
+```{r}
+plot_std_residuals(arma55garch35)
+plot_std_sq_residuals(arma55garch35)
+plot_conditional_sd(arma55garch35)
+```
+
+#### Comment
+
+- All GARCH lags are insignificant, except for GARCH(5). 
+- ACF of standardized residuals shows no autocorrelation.
+- ACF of squared standardized residuals also shows no autocorrelation (significance of 3rd lag is marginal).
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. 
+- Model is rather complex, it isn't worth considering because of insignificant lags estimation.
+
+
+## Model Selection
+
+Since for most models LM and LB tests have not been able to reject null-hypothesis of no standardized simple/squared residuals autocorrelation, and the 3rd ACF lag for standardized squared residuals has not been removed fully by each model as well, we decide to choose among models which are the simplest and/or have the largest number of significant coefficient estimations.
+
+These models are ARMA(0,0)-GARCH(2,1), ARMA(0,0)-GARCH(3,3) and ARMA(5,5)-GARCH(2,1).
+
+```{r}
+infocriteria(arma00garch21)
+infocriteria(arma00garch33)
+infocriteria(arma55garch21)
+```
+
+If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the second best AIC and best BIC, ARMA(0,0)-GARCH(3,3) has the second best BIC but worst AIC, and ARMA(5,5)-GARCH(2,1) has best AIC but worst BIC. Based on this, it seems that the simpler **ARMA(0,0)-GARCH(2,1)** is better, hence we will proceed with it.
+
+# Futher Diagnostics
