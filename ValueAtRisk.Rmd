@@ -565,28 +565,59 @@ If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the second bes
 # Value-at-Risk
 
 ```{r}
+plot_var = function(dates, returns, vars){
+  plot(dates, returns, 
+   col = "red", lwd = 1, type = 'l', 
+   ylim = c(-0.2, 0.2))
+  abline(h = 0, lty = 2)
+  lines(dates, vars, type = 'l', col = "green")
+}
 
+var_losses = function(returns, vars){
+  sum(returns < vars) / length(vars)
+}
+```
 
-chosen_garch <- arma00garch21
+```{r}
+chosen_garch <- fit_garch(insample_r$r, 0, 0, 3, 3)
 ```
 
 
 Value-at-Risk is assumed at confidence level 1%. The empirical quantile is:
 
 ```{r}
-q01 <- quantile(insample_r$rstd, 0.01)
-q01
+threshold = 0.01
+var_q <- quantile(insample_r$rstd, threshold)
+var_q
 ```
 
 ## In-sample
 
+### GARCH
+
 Calculate VAR from chosen model.
 
 ```{r}
-# insample_r$VaR <- q01 * 
+vars <- var_q * chosen_garch@fit$sigma
+```
+```{r}
+plot_var(insample_r$Date, insample_r$r, vars)
 ```
 
-### GARCH
+In how many days do we breach the VaR threshold of `r threshold`?
+
+```{r}
+var_losses(insample_r$r, vars)
+```
+A little worse than expected. Let's test with level 5%.
+
+```{r}
+vars <- quantile(insample_r$rstd, 0.05) * chosen_garch@fit$sigma
+plot_var(insample_r$Date, insample_r$r, vars)
+var_losses(insample_r$r, vars)
+```
+Level 5% is in expected range.
+
 
 ## Out-of-sample
 
