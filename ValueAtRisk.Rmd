@@ -291,7 +291,6 @@ The overall conclusion is that there are ARCH effects present in the log-returns
 
 ```{r}
 insample_r <- joined_returns %>% filter(Date < as.Date('2023-01-01'))
-outofsample_r <- joined_returns %>% filter(Date >= as.Date('2023-01-01'))
 ```
 
 ```{r}
@@ -563,10 +562,15 @@ If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the second bes
 # Value-at-Risk
 
 ```{r}
-plot_var = function(dates, returns, vars){
+plot_var = function(dates, returns, vars, ylims){
+  if(missing(ylims))
+  {
+    ylims = c(-0.2, 0.1)
+  }
+  
   plot(dates, returns, 
    col = "red", lwd = 1, type = 'l', 
-   ylim = c(-0.2, 0.2))
+   ylim = ylims)
   abline(h = 0, lty = 2)
   lines(dates, vars, type = 'l', col = "green")
 }
@@ -577,7 +581,9 @@ var_losses = function(returns, vars){
 ```
 
 ```{r}
-chosen_garch <- fit_garch(insample_r$r, 0, 0, 2, 1)
+chosen_garch = function(returns){
+  return(fit_garch(returns, 0, 0, 2, 1))
+}
 ```
 
 
@@ -602,7 +608,8 @@ var_q
 Calculate VAR from chosen model.
 
 ```{r}
-vars <- var_q * chosen_garch@fit$sigma
+insample_garch <- chosen_garch(insample_r$r)
+vars <- var_q * insample_garch@fit$sigma
 ```
 ```{r}
 plot_var(insample_r$Date, insample_r$r, vars)
@@ -613,25 +620,55 @@ In how many days do we breach the VaR quantile of `r threshold`?
 ```{r}
 var_losses(insample_r$r, vars)
 ```
-Worse than expected. Let's test with level 5%.
+Worse than expected. Let's test with VaR 5%.
 
 ```{r}
-vars <- get_var_quantile(insample_r$r, 0.05) * chosen_garch@fit$sigma
+vars <- get_var_quantile(insample_r$r, 0.05) * insample_garch@fit$sigma
 plot_var(insample_r$Date, insample_r$r, vars)
 var_losses(insample_r$r, vars)
 ```
-Level 5% is in expected range.
+
+VaR 5% breaches are in expected range.
 
 
 ## Out-of-sample
 
 ```{r}
 joined_returns$obs <- 1:length(joined_returns$r)
+outofsample_r <- joined_returns %>% filter(Date >= as.Date('2023-01-01'))
 
-forecast_rolling_var = function() {
+start <- (joined_returns %>% 
+            filter(Date >= as.Date("2023-01-01")) %>% 
+            filter(row_number() == 1))$obs
+finish  <- (joined_returns %>% filter(row_number() == n()))$obs
+
+forecast_rolling_var = function(q_value, garch_func) {
+  vars <- rep(NA, times = finish - start + 1)
   
+  for(new_idx in start:finish){
+     rolling_data <- joined_returns[joined_returns$obs <= new_idx-1, ]
+     q <- get_var_quantile(rolling_data$r, q_value)
+     
+     rolling_garch <- garch_func(rolling_data$r)
+     forecast <- ugarchforecast(rolling_garch, n.ahead = 1)
+     sigma_for <- forecast@forecast$sigmaFor[1, 1]
+     
+     vars[new_idx - start + 1]    <- q * sigma_for
+  }
+  
+  return(vars)
 }
 
 ```
 
+
 ### GARCH
+
+```{r}
+vars <- forecast_rolling_var(0.01, chosen_garch)
+```
+```{r}
+plot_var(outofsample_r$Date, outofsample_r$r, vars, ylims=c(-0.05, 0.05))
+var_losses(outofsample_r$r, vars)
+```
+There are no return values breaching VaR 1%.
