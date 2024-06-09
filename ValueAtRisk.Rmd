@@ -192,7 +192,7 @@ print(sprintf("NAs left: %i", sum(is.na(joined_returns))))
 The rest of the possible missing returns we are replacing with zeros.
 
 ```{r}
-joined_returns <- joined_returns %>% replace(is.na(.), 0) %>% column_to_rownames(., var = "Date")
+joined_returns <- joined_returns %>% replace(is.na(.), 0)
 ```
 
 Now let's calculate the log-return of portfolio ($w_i=w=1/N$, $R$ stands for arithmetic return, $r$ - for logarithmic return).
@@ -290,13 +290,20 @@ The overall conclusion is that there are ARCH effects present in the log-returns
 # Estimating GARCH models
 
 ```{r}
-fit_garch = function(arma_p, arma_q, arch_q, garch_p){
+joined_returns$rstd <- (joined_returns$r - mean(joined_returns$r))/sd(joined_returns$r)
+
+insample_r <- joined_returns %>% filter(Date < as.Date('2023-01-01'))
+outofsample_r <- joined_returns %>% filter(Date >= as.Date('2023-01-01'))
+```
+
+```{r}
+fit_garch = function(returns, arma_p, arma_q, arch_q, garch_p){
   spec <- ugarchspec(
     variance.model = list(model = "sGARCH",
                           garchOrder = c(arch_q, garch_p)),
     mean.model = list(armaOrder = c(arma_p, arma_q), include.mean = T),
     distribution.model = "norm")
-  model <- ugarchfit(spec=spec, data=joined_returns$r)
+  model <- ugarchfit(spec=spec, data=returns)
   return(model)
 }
 
@@ -318,7 +325,7 @@ plot_conditional_sd = function(fit_model){
 
 ```
 ```{r}
-arma00garch11 <- fit_garch(0, 0, 1, 1)
+arma00garch11 <- fit_garch(insample_r$r, 0, 0, 1, 1)
 arma00garch11
 ```
 
@@ -338,7 +345,7 @@ plot_conditional_sd(arma00garch11)
 ### ARMA(0,0)-GARCH(2,1)
 
 ```{r}
-arma00garch21 <- fit_garch(0, 0, 2, 1)
+arma00garch21 <- fit_garch(insample_r$r, 0, 0, 2, 1)
 arma00garch21
 ```
 
@@ -359,7 +366,7 @@ plot_conditional_sd(arma00garch21)
 ### ARMA(0,0)-GARCH(1,2)
 
 ```{r}
-arma00garch12 <- fit_garch(0, 0, 1, 2)
+arma00garch12 <- fit_garch(insample_r$r, 0, 0, 1, 2)
 arma00garch12
 ```
 ```{r}
@@ -379,7 +386,7 @@ plot_conditional_sd(arma00garch12)
 ### ARMA(0,0)-GARCH(2,2)
 
 ```{r}
-arma00garch22 <- fit_garch(0, 0, 2, 2)
+arma00garch22 <- fit_garch(insample_r$r, 0, 0, 2, 2)
 arma00garch22
 ```
 ```{r}
@@ -399,7 +406,7 @@ plot_conditional_sd(arma00garch22)
 ### ARMA(0,0)-GARCH(3,3)
 
 ```{r}
-arma00garch33 <- fit_garch(0, 0, 3, 3)
+arma00garch33 <- fit_garch(insample_r$r, 0, 0, 3, 3)
 arma00garch33
 ```
 
@@ -420,7 +427,7 @@ Perhaps, now we should move to altering mean equation to see the effects.
 
 ### ARMA(7,0)-GARCH(2,1)
 ```{r}
-arma70garch21 <- fit_garch(7, 0, 2, 1)
+arma70garch21 <- fit_garch(insample_r$r, 7, 0, 2, 1)
 arma70garch21
 ```
 
@@ -440,7 +447,7 @@ plot_conditional_sd(arma70garch21)
 
 ### ARMA(7,7)-GARCH(2,1)
 ```{r}
-arma77garch21 <- fit_garch(7, 7, 2, 1)
+arma77garch21 <- fit_garch(insample_r$r, 7, 7, 2, 1)
 arma77garch21
 ```
 ```{r}
@@ -451,7 +458,7 @@ plot_conditional_sd(arma77garch21)
 
 #### Comment
 
-- AR(2), AR(4), AR(7), MA(2), MA(4), MA(7) lags are insignificant, as well as ARCH(2). 
+- AR(3), AR(4), MA(3), MA(4) lags are insignificant, as well as ARCH(2). 
 - ACF of standardized residuals confidently shows no autocorrelation.
 - ACF of squared standardized residuals shows significant third lag, as in all previous cases.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
@@ -461,7 +468,7 @@ Let's try reducing amount of ARMA lags.
 
 ### ARMA(5,5)-GARCH(2,1)
 ```{r}
-arma55garch21 <- fit_garch(5, 5, 2, 1)
+arma55garch21 <- fit_garch(insample_r$r, 5, 5, 2, 1)
 arma55garch21
 ```
 ```{r}
@@ -481,7 +488,7 @@ Let's try adding more GARCH components.
 
 ### ARMA(5,5)-GARCH(2,2)
 ```{r}
-arma55garch22 <- fit_garch(5, 5, 2, 2)
+arma55garch22 <- fit_garch(insample_r$r, 5, 5, 2, 2)
 arma55garch22
 ```
 ```{r}
@@ -492,14 +499,14 @@ plot_conditional_sd(arma55garch22)
 
 #### Comment
 
-- Again, only ARCH(2) is insignificant. 
+- ARCH(2), GARCH(2) are insignificant. 
 - ACF of standardized residuals showed significant 9th lag.
 - ACF of squared standardized residuals shows significant third lag and 14th.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. Nevertheless, ACF plots are not great, and we can conclude that this model is not that good.
 
 ### ARMA(5,5)-GARCH(3,3)
 ```{r}
-arma55garch33 <- fit_garch(5, 5, 3, 3)
+arma55garch33 <- fit_garch(insample_r$r, 5, 5, 3, 3)
 arma55garch33
 ```
 ```{r}
@@ -512,16 +519,16 @@ plot_conditional_sd(arma55garch33)
 #### Comment
 
 
-- More lags are insignificant: AR(2), AR(3), MA(2), MA(3), ARCH(1), ARCH(2), GARCH(1), GARCH(2). 
-- ACF of standardized residuals showed significant 9th lag.
-- ACF of squared standardized residuals shows significant third lag and 14th.
+- ARCH(1), GARCH(1), GARCH(2) are insignificant. 
+- ACF of standardized residuals shows no autocorrelation.
+- ACF of squared standardized residuals shows three significant lags.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. Nevertheless, the p-values are somewhat underwhelming, and together with ACF plots we can conclude that this model is not that good.
 
 Overall performance is not improving: more insignificant lags are appearing, and ACF plots are worsening.
 
 ### ARMA(5,5)-GARCH(3,5)
 ```{r}
-arma55garch35 <- fit_garch(5, 5, 3, 5)
+arma55garch35 <- fit_garch(insample_r$r, 5, 5, 3, 5)
 arma55garch35
 ```
 ```{r}
@@ -532,9 +539,9 @@ plot_conditional_sd(arma55garch35)
 
 #### Comment
 
-- All GARCH lags are insignificant, except for GARCH(5). 
+- ARCH(1) and GARCH lags are insignificant, except for GARCH(5). 
 - ACF of standardized residuals shows no autocorrelation.
-- ACF of squared standardized residuals also shows no autocorrelation (significance of 3rd lag is marginal).
+- ACF of squared standardized residuals also shows no autocorrelation.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. 
 - Model is rather complex, it isn't worth considering because of insignificant lags estimation.
 
@@ -554,3 +561,33 @@ infocriteria(arma55garch21)
 If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the second best AIC and best BIC, ARMA(0,0)-GARCH(3,3) has the second best BIC but worst AIC, and ARMA(5,5)-GARCH(2,1) has best AIC but worst BIC. Based on this, it seems that the simpler **ARMA(0,0)-GARCH(2,1)** is better, hence we will proceed with it.
 
 # Futher Diagnostics
+
+# Value-at-Risk
+
+```{r}
+
+
+chosen_garch <- arma00garch21
+```
+
+
+Value-at-Risk is assumed at confidence level 1%. The empirical quantile is:
+
+```{r}
+q01 <- quantile(insample_r$rstd, 0.01)
+q01
+```
+
+## In-sample
+
+Calculate VAR from chosen model.
+
+```{r}
+# insample_r$VaR <- q01 * 
+```
+
+### GARCH
+
+## Out-of-sample
+
+### GARCH
