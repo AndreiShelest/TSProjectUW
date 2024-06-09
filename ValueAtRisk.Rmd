@@ -290,8 +290,6 @@ The overall conclusion is that there are ARCH effects present in the log-returns
 # Estimating GARCH models
 
 ```{r}
-joined_returns$rstd <- (joined_returns$r - mean(joined_returns$r))/sd(joined_returns$r)
-
 insample_r <- joined_returns %>% filter(Date < as.Date('2023-01-01'))
 outofsample_r <- joined_returns %>% filter(Date >= as.Date('2023-01-01'))
 ```
@@ -579,15 +577,21 @@ var_losses = function(returns, vars){
 ```
 
 ```{r}
-chosen_garch <- fit_garch(insample_r$r, 0, 0, 3, 3)
+chosen_garch <- fit_garch(insample_r$r, 0, 0, 2, 1)
 ```
 
 
 Value-at-Risk is assumed at confidence level 1%. The empirical quantile is:
 
 ```{r}
+get_var_quantile = function(returns, q_value) {
+  rstd <- (returns - mean(returns))/sd(returns)
+  q <-  quantile(rstd, q_value)
+  return(q)
+}
+
 threshold = 0.01
-var_q <- quantile(insample_r$rstd, threshold)
+var_q <- get_var_quantile(insample_r$r, threshold)
 var_q
 ```
 
@@ -604,15 +608,15 @@ vars <- var_q * chosen_garch@fit$sigma
 plot_var(insample_r$Date, insample_r$r, vars)
 ```
 
-In how many days do we breach the VaR threshold of `r threshold`?
+In how many days do we breach the VaR quantile of `r threshold`?
 
 ```{r}
 var_losses(insample_r$r, vars)
 ```
-A little worse than expected. Let's test with level 5%.
+Worse than expected. Let's test with level 5%.
 
 ```{r}
-vars <- quantile(insample_r$rstd, 0.05) * chosen_garch@fit$sigma
+vars <- get_var_quantile(insample_r$r, 0.05) * chosen_garch@fit$sigma
 plot_var(insample_r$Date, insample_r$r, vars)
 var_losses(insample_r$r, vars)
 ```
@@ -620,5 +624,14 @@ Level 5% is in expected range.
 
 
 ## Out-of-sample
+
+```{r}
+joined_returns$obs <- 1:length(joined_returns$r)
+
+forecast_rolling_var = function() {
+  
+}
+
+```
 
 ### GARCH
