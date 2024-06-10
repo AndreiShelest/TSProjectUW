@@ -319,6 +319,16 @@ plot_std_sq_residuals = function(fit_model){
 plot_conditional_sd = function(fit_model){
   plot(fit_model, which=3)
 }
+plot_news_impact_curve = function(fit_model) {
+  plot(fit_model, which=12)
+}
+plot_r_std_density = function(fit_model){
+  std_residuals = (fit_model@fit$residuals - mean(fit_model@fit$residuals)) / fit_model@fit$sigma
+
+  hist(std_residuals, prob=TRUE, breaks=40)
+  curve(dnorm(x, mean = mean(std_residuals), sd  = sd(std_residuals)),
+            col = "darkblue", lwd = 3, add = TRUE)
+}
 
 ```
 ```{r}
@@ -374,7 +384,7 @@ plot_conditional_sd(arma00garch12)
 
 #### Comment
 
-- GARCH(2) is not significant. 
+- GARCH(2) is not significant and estimated to be zero. 
 - ACF of standardized residuals shows almost no autocorrelation.
 - ACF of squared standardized residuals shows significant third lag.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals (except for maybe LB 8th lag, but LM test shows no autocorrelation)
@@ -394,7 +404,7 @@ plot_conditional_sd(arma00garch22)
 
 #### Comment
 
-- ARCH(1), ARCH(2) and GARCH(2) parameters are not significant. 
+- ARCH(1), ARCH(2) and GARCH(2) parameters are not significant. GARCH(2) is close to zero. 
 - ACF of standardized residuals shows almost no autocorrelation.
 - ACF of squared standardized residuals shows significant third lag.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
@@ -415,7 +425,7 @@ plot_conditional_sd(arma00garch33)
 
 #### Comment
 
-- ARCH(1) and GARCH(2) parameters are not significant. 
+- ARCH(1) and GARCH(2) parameters are not significant. GARCH(2) is even estimated to be zero. 
 - ACF of standardized residuals shows almost no autocorrelation.
 - ACF of squared standardized residuals shows significant third lag, but its magnitude is the lowest as of now.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
@@ -516,7 +526,7 @@ plot_conditional_sd(arma55garch33)
 #### Comment
 
 
-- ARCH(1), GARCH(1), GARCH(2) are insignificant. 
+- ARCH(1), GARCH(1), GARCH(2) are insignificant. GARCH(2) is estimated to be zero. 
 - ACF of standardized residuals shows no autocorrelation.
 - ACF of squared standardized residuals shows three significant lags.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. Nevertheless, the p-values are somewhat underwhelming, and together with ACF plots we can conclude that this model is not that good.
@@ -536,7 +546,7 @@ plot_conditional_sd(arma55garch35)
 
 #### Comment
 
-- ARCH(1) and GARCH lags are insignificant, except for GARCH(5). 
+- ARCH(1) and GARCH lags are insignificant, except for GARCH(5). GARCH(1), GARCH(3), GARCH(4) are zeros.
 - ACF of standardized residuals shows no autocorrelation.
 - ACF of squared standardized residuals also shows no autocorrelation.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. 
@@ -557,7 +567,66 @@ infocriteria(arma55garch21)
 
 If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the second best AIC and best BIC, ARMA(0,0)-GARCH(3,3) has the second best BIC but worst AIC, and ARMA(5,5)-GARCH(2,1) has best AIC but worst BIC. Based on this, it seems that the simpler **ARMA(0,0)-GARCH(2,1)** is better, hence we will proceed with it.
 
+```{r}
+chosen_garch = function(returns){
+  return(fit_garch(returns, 0, 0, 2, 1))
+}
+```
+
 # Futher Diagnostics
+
+## ARMA(0,0)-GARCH(2,1)
+
+Let's display the statistics of the model again.
+
+```{r}
+arma00garch21
+```
+### Parameters Discussion
+
+As mentioned previously, ARCH(1) and ARCH(2) are insignificant.
+
+- Mu is an estimated mean of log-returns. It is close to zero, which is expected for log-returns.
+- Omega is an intercept of conditional variance equation. It is positive and very close to zero.
+- ARCH parameters are positive but small, indicating that lagged shocks somewhat influence the current conditional variance
+- GARCH(1) of 0.82 shows strong influence of lagged conditional variance.
+
+
+
+
+### Nyblom stability test
+
+Regarding Nyblom stability test, we see that the joint stability statistic is large, 6.3395 > 1.47 at 5% confidence level. Hence we reject null hypothesis of joint parameter stability. Nevertheless, all individual statistics are smaller than 0.47, hence we cannot reject the null of individual parameter stability.
+
+### Sign Bias Test
+
+Negative Sign Bias test rejects the null of no asymmetry. It means that the model reacts strongly on negative returns. The joint effect of biases is also significant.
+
+### Goodness-of-Fit Test
+
+All p-values are small, suggesting that the model does not fit the data well in any grouping.
+
+### News Impact Curve
+
+```{r}
+plot_news_impact_curve(arma00garch21)
+```
+The news impact curve shows that lagged shock value impacts current conditional variance equally.
+
+### Standardized residuals
+
+```{r}
+plot_r_std_density(arma00garch21)
+```
+```{r}
+std_residuals = (arma00garch21@fit$residuals 
+                 - mean(arma00garch21@fit$residuals)) / arma00garch21@fit$sigma
+
+print(basicStats(std_residuals))
+print(jarque.bera.test(std_residuals))
+```
+
+The distribution of standardized residuals is platykurtic.
 
 # Value-at-Risk
 
@@ -580,11 +649,6 @@ var_losses = function(returns, vars){
 }
 ```
 
-```{r}
-chosen_garch = function(returns){
-  return(fit_garch(returns, 0, 0, 2, 1))
-}
-```
 
 
 Value-at-Risk is assumed at confidence level 1%. The empirical quantile is:
