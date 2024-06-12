@@ -294,12 +294,24 @@ insample_r <- joined_returns %>% filter(Date < as.Date('2023-01-01'))
 ```
 
 ```{r}
-fit_garch = function(returns, arma_p, arma_q, arch_q, garch_p){
+fit_garch = function(returns, arma_p, arma_q, arch_q, garch_p, model_type = "sGARCH", submodel = NULL){
+
+  if(!is.null(submodel) && model_type == "fGARCH"){
+    variance_model = list(model = model_type,
+                          submodel = submodel,
+                          garchOrder = c(arch_q, garch_p))
+  } else {
+    variance_model = list(model = model_type,
+                          garchOrder = c(arch_q, garch_p))
+  }
+  
+  # Specify the GARCH model
   spec <- ugarchspec(
-    variance.model = list(model = "sGARCH",
-                          garchOrder = c(arch_q, garch_p)),
-    mean.model = list(armaOrder = c(arma_p, arma_q), include.mean = T),
+    variance.model = variance_model,
+    mean.model = list(armaOrder = c(arma_p, arma_q), include.mean = TRUE),
     distribution.model = "norm")
+  
+
   model <- ugarchfit(spec=spec, data=returns)
   return(model)
 }
@@ -552,6 +564,103 @@ plot_conditional_sd(arma55garch35)
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. 
 - Model is rather complex, it isn't worth considering because of insignificant lags estimation.
 
+### EGARCH models
+
+### ARMA(0, 0)-EGARCH (1, 1)
+
+In this part, we will try other types of GARCH models, with various parameters. Let's begin with EGARCH.
+
+```{r}
+arma00egarch11 <- fit_garch(insample_r$r, 0, 0, 1, 1,model_type = "eGARCH")
+arma00egarch11
+```
+
+
+```{r}
+plot_std_residuals(arma00egarch11)
+plot_std_sq_residuals(arma00egarch11)
+plot_conditional_sd(arma00egarch11)
+```
+#### Comment
+
+tbd
+
+#### ARMA(0,0)-EGARCH(2, 1)
+
+```{r}
+arma00egarch21 <- fit_garch(insample_r$r, 0, 0, 2, 1,model_type = "eGARCH")
+arma00egarch21
+```
+
+```{r}
+plot_std_residuals(arma00egarch21)
+plot_std_sq_residuals(arma00egarch21)
+plot_conditional_sd(arma00egarch21)
+```
+### ARMA(0,0)-EGARCH(1, 2)
+
+```{r}
+arma00egarch12 <- fit_garch(insample_r$r, 0, 0, 1, 2,model_type = "eGARCH")
+arma00egarch12
+```
+
+```{r}
+plot_std_residuals(arma00egarch12)
+plot_std_sq_residuals(arma00egarch12)
+plot_conditional_sd(arma00egarch12)
+```
+### Comment 
+
+tbd
+
+## TGARCH Models
+
+```{r}
+arma00tgarch11 <- fit_garch(insample_r$r, 0, 0, 1, 1,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch11
+```
+
+```{r}
+plot_std_residuals(arma00tgarch11)
+plot_std_sq_residuals(arma00tgarch11)
+plot_conditional_sd(arma00tgarch11)
+```
+
+
+```{r}
+arma00tgarch12 <- fit_garch(insample_r$r, 0, 0, 1, 2,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch12
+```
+
+```{r}
+plot_std_residuals(arma00tgarch12)
+plot_std_sq_residuals(arma00tgarch12)
+plot_conditional_sd(arma00tgarch12)
+```
+#### ARMA(0,0)-TGARCH(2,1)
+
+```{r}
+arma00tgarch21 <- fit_garch(insample_r$r, 0, 0, 2,1,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch21
+```
+
+```{r}
+plot_std_residuals(arma00tgarch21)
+plot_std_sq_residuals(arma00tgarch21)
+plot_conditional_sd(arma00tgarch21)
+```
+#### ARMA(0, 0) TGARCH(3, 3)
+```{r}
+arma00tgarch33 <- fit_garch(insample_r$r, 1, 1, 3, 3,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch33
+```
+
+```{r}
+plot_std_residuals(arma00tgarch33)
+plot_std_sq_residuals(arma00tgarch33)
+plot_conditional_sd(arma00tgarch33)
+```
+#### Comment
 
 ## Model Selection
 
