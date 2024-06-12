@@ -573,6 +573,39 @@ chosen_garch = function(returns){
 }
 ```
 
+## ARMA(0,0)-EGARCH(2,1)
+
+Let's analyze the modification of the original model and see if it performs better.
+
+```{r}
+chosen_mod_garch = function(returns){
+  spec <- ugarchspec(variance.model = list(model = "eGARCH", 
+                                         garchOrder = c(2, 1)),
+                   mean.model = list(armaOrder = c(0, 0), 
+                                     include.mean = TRUE), 
+                   distribution.model = "norm") 
+  egarch_model <- ugarchfit(spec = spec, 
+                           data = returns)
+  return(egarch_model)
+}
+```
+```{r}
+arma00egarch21 <- chosen_mod_garch(insample_r$r)
+arma00egarch21
+```
+```{r}
+plot_std_residuals(arma00egarch21)
+plot_std_sq_residuals(arma00egarch21)
+plot_conditional_sd(arma00egarch21)
+```
+#### Comment
+
+- Only gamma2 is insignificant.
+- ACF of standardized residuals shows no autocorrelation.
+- ACF of squared standardized residuals has only one third significant lag.
+- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject the null. 
+
+
 # Futher Diagnostics
 
 ## ARMA(0,0)-GARCH(2,1)
@@ -627,6 +660,51 @@ print(jarque.bera.test(std_residuals))
 ```
 
 The distribution of standardized residuals is platykurtic.
+
+## ARMA(0,0)-EGARCH(2,1)
+
+```{r}
+arma00egarch21
+```
+
+### Parameter Discussion
+
+- GARCH(1) is very large and highly significant. This means that previous conditional variance pretty much defines the current one.
+- Gamma captures the size effect, i.e. how much the influence of the $|z_{t-j}|-E|z_{t-j}|$ component is (according to the https://cran.r-project.org/web/packages/rugarch/vignettes/Introduction_to_the_rugarch_package.pdf). Here we see that it is positive, i.e. the father standardized residuals by abs. value are from their mean, the more is the level of conditional variance.
+
+### Nyblom Stability Test
+
+The test fails to reject the null of both joined and individual parameter stability (all statistics are smaller than 1.9).
+
+### Sign Bias Test
+
+We cannot reject the null of no asymmetry. Hence, the model should behave stably with both negative and positive returns.
+
+### Goodness-of-Fit Test
+
+All p-values are small, suggesting that the model does not fit the data well in any grouping.
+
+### News Impact Curve
+
+```{r}
+plot_news_impact_curve(arma00egarch21)
+```
+The news impact curve shows that negative lagged shock values impact current conditional variance much more than positive, which is a desirable effect for returns.
+
+### Standardized residuals
+
+```{r}
+plot_r_std_density(arma00egarch21)
+```
+```{r}
+std_residuals = (arma00egarch21@fit$residuals 
+                 - mean(arma00egarch21@fit$residuals)) / arma00egarch21@fit$sigma
+
+print(basicStats(std_residuals))
+print(jarque.bera.test(std_residuals))
+```
+
+The distribution of standardized residuals is still platykurtic.
 
 # Value-at-Risk
 
@@ -694,6 +772,33 @@ var_losses(insample_r$r, vars)
 
 VaR 5% breaches are in expected range.
 
+### EGARCH
+
+Calculate VAR from chosen EGARCH model.
+
+```{r}
+insample_egarch <- chosen_mod_garch(insample_r$r)
+vars <- var_q * insample_egarch@fit$sigma
+```
+```{r}
+plot_var(insample_r$Date, insample_r$r, vars)
+```
+
+In how many days do we breach the VaR quantile of `r threshold`?
+
+```{r}
+var_losses(insample_r$r, vars)
+```
+The result is acceptable. Let's test with VaR 5%.
+
+```{r}
+vars <- get_var_quantile(insample_r$r, 0.05) * insample_egarch@fit$sigma
+plot_var(insample_r$Date, insample_r$r, vars)
+var_losses(insample_r$r, vars)
+```
+
+VaR 5% breaches are in expected range.
+
 
 ## Out-of-sample
 
@@ -730,6 +835,17 @@ forecast_rolling_var = function(q_value, garch_func) {
 
 ```{r}
 vars <- forecast_rolling_var(0.01, chosen_garch)
+```
+```{r}
+plot_var(outofsample_r$Date, outofsample_r$r, vars, ylims=c(-0.05, 0.05))
+var_losses(outofsample_r$r, vars)
+```
+There are no return values breaching VaR 1%.
+
+### EGARCH
+
+```{r}
+vars <- forecast_rolling_var(0.01, chosen_mod_garch)
 ```
 ```{r}
 plot_var(outofsample_r$Date, outofsample_r$r, vars, ylims=c(-0.05, 0.05))
