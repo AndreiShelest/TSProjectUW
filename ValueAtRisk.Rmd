@@ -589,9 +589,14 @@ plot_conditional_sd(arma00egarch11)
 ```
 #### Comment
 
-- The significant omega, alpha1, beta1, and gamma1 terms indicate the presence of volatility clustering, persistence in volatility, and leverage effects
+- Significant terms: omega, alpha1, beta1, gamma1
 
-- Tests suggest that the model adequately captures the volatility dynamics, with no significant remaining autocorrelation or ARCH effects, although there are some indications of potential remaining ARCH effects in the weighted ARCH LM tests
+- The Ljung-Box tests for both residuals and squared residuals have high p-values, indicating no significant serial correlation or remaining ARCH effects, implying a well-fitted model
+
+- The ARCH LM test shows some significant ARCH effects at lower lags, suggesting there may still be some unmodeled volatility clustering
+
+- The model parameters indicate high persistence in conditional standard deviation (volatility), meaning that volatility shocks have a prolonged effect on future volatility.
+
 
 
 #### ARMA(0,0)-EGARCH(2, 1)
@@ -879,7 +884,7 @@ vars <- var_q * insample_garch@fit$sigma
 plot_var(insample_r$Date, insample_r$r, vars)
 ```
 
-In how many days do we breach the VaR quantile of `r threshold`?
+
 
 ```{r}
 var_losses(insample_r$r, vars)
@@ -912,6 +917,7 @@ forecast_rolling_var = function(q_value, garch_func) {
   for(new_idx in start:finish){
      rolling_data <- joined_returns[joined_returns$obs <= new_idx-1, ]
      q <- get_var_quantile(rolling_data$r, q_value)
+     # print(paste("step:", new_idx))
      
      rolling_garch <- garch_func(rolling_data$r)
      forecast <- ugarchforecast(rolling_garch, n.ahead = 1)
