@@ -778,11 +778,75 @@ Based on the criteria above, ARMA(5,5)-TGARCH(1,2) has the lowest AIC, Shibata, 
 
 ```{r}
 chosen_garch = function(returns){
-  return(fit_garch(insample_r$r, 0, 0, 3, 3,model_type = "eGARCH"))
+  return(fit_garch(returns, 0, 0, 2, 1))
+}
+```
+
+```{r}
+chosen_mod_garch = function(returns){
+  spec <- ugarchspec(variance.model = list(model = "eGARCH", 
+                                         garchOrder = c(3, 3)),
+                   mean.model = list(armaOrder = c(0, 0), 
+                                     include.mean = TRUE), 
+                   distribution.model = "norm") 
+  egarch_model <- ugarchfit(spec = spec, 
+                           data = returns)
+  return(egarch_model)
+
+arma00egarch33 <- chosen_mod_garch(insample_r$r)
 }
 ```
 
 # Futher Diagnostics
+
+## ARMA(0,0)-GARCH(2,1)
+
+#### PArameters 
+
+As mentioned previously, ARCH(1) and ARCH(2) are insignificant.
+
+Mu is an estimated mean of log-returns. It is close to zero, which is expected for log-returns.
+Omega is an intercept of conditional variance equation. It is positive and very close to zero.
+ARCH parameters are positive but small, indicating that lagged shocks somewhat influence the current conditional variance
+GARCH(1) of 0.82 shows strong influence of lagged conditional variance.
+
+#### Nyblom Stability test
+
+Regarding Nyblom stability test, we see that the joint stability statistic is large, 6.3395 > 1.47 at 5% confidence level. Hence we reject null hypothesis of joint parameter stability. Nevertheless, all individual statistics are smaller than 0.47, hence we cannot reject the null of individual parameter stability.
+
+#### Sign bias test
+
+Negative Sign Bias test rejects the null of no asymmetry. It means that the model reacts strongly on negative returns. The joint effect of biases is also significant.
+
+#### Goodness-of-fit test
+All p-values are small, suggesting that the model does not fit the data well in any grouping.
+
+#### News impact curve
+
+```{r}
+plot_news_impact_curve(arma00garch21)
+```
+
+shows that lagged shock value impacts current conditional variance equally.
+
+### Standardized residuals
+
+```{r}
+plot_r_std_density(arma00garch21)
+```
+
+```{r}
+std_residuals = (arma00garch21@fit$residuals 
+                 - mean(arma00garch21@fit$residuals)) / arma00garch21@fit$sigma
+
+print(basicStats(std_residuals))
+```
+
+```{r}
+print(jarque.bera.test(std_residuals))
+```
+
+
 
 ## ARMA(0,0)-EGARCH(3,3)
 
@@ -818,7 +882,6 @@ The goodness-of-fit test indicates a good fit overall, though some groups show s
 ```{r}
 plot_news_impact_curve(arma00egarch33)
 ```
-The news impact curve shows that lagged shock value impacts current conditional variance equally.
 
 ### Standardized residuals
 
@@ -901,6 +964,27 @@ var_losses(insample_r$r, vars)
 
 VaR 5% breaches are in expected range.
 
+### EGARCH
+```{r}
+insample_egarch <- chosen_mod_garch(insample_r$r)
+vars <- var_q * insample_egarch@fit$sigma
+```
+
+```{r}
+plot_var(insample_r$Date, insample_r$r, vars)
+```
+```{r}
+var_losses(insample_r$r, vars)
+```
+
+```{r}
+vars <- get_var_quantile(insample_r$r, 0.05) * insample_egarch@fit$sigma
+plot_var(insample_r$Date, insample_r$r, vars)
+```
+```{r}
+var_losses(insample_r$r, vars)
+```
+
 
 ## Out-of-sample
 
@@ -949,3 +1033,19 @@ plot_var(outofsample_r$Date, outofsample_r$r, vars, ylims=c(-0.05, 0.05))
 var_losses(outofsample_r$r, vars)
 ```
 There are no return values breaching VaR 1%.
+
+### EGARCH
+
+```{r}
+vars <- forecast_rolling_var(0.01, chosen_mod_garch)
+```
+
+```{r}
+plot_var(outofsample_r$Date, outofsample_r$r, vars, ylims=c(-0.05, 0.05))
+```
+
+
+```{r}
+var_losses(outofsample_r$r, vars)
+```
+
