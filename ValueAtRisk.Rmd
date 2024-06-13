@@ -287,7 +287,7 @@ We see more pronounced left tail and high kurtosis.
 
 The overall conclusion is that there are ARCH effects present in the log-returns of the portfolio.
 
-# Estimating GARCH models
+# Modelling
 
 ```{r}
 insample_r <- joined_returns %>% filter(Date < as.Date('2023-01-01'))
@@ -317,6 +317,10 @@ fit_garch = function(returns, arma_p, arma_q, arch_q, garch_p, model_type = "sGA
 }
 
 ```
+
+## Standard GARCH models
+
+Let's begin with fitting some standard GARCH models
 
 ### ARMA(0,0)-GARCH(1,1)
 
@@ -566,9 +570,11 @@ plot_conditional_sd(arma55garch35)
 
 ### EGARCH models
 
-### ARMA(0, 0)-EGARCH (1, 1)
-
 In this part, we will try other types of GARCH models, with various parameters. Let's begin with EGARCH.
+
+### ARMA(0,0)-EGARCH(1,1)
+
+
 
 ```{r}
 arma00egarch11 <- fit_garch(insample_r$r, 0, 0, 1, 1,model_type = "eGARCH")
@@ -583,7 +589,10 @@ plot_conditional_sd(arma00egarch11)
 ```
 #### Comment
 
-tbd
+- The significant omega, alpha1, beta1, and gamma1 terms indicate the presence of volatility clustering, persistence in volatility, and leverage effects
+
+- Tests suggest that the model adequately captures the volatility dynamics, with no significant remaining autocorrelation or ARCH effects, although there are some indications of potential remaining ARCH effects in the weighted ARCH LM tests
+
 
 #### ARMA(0,0)-EGARCH(2, 1)
 
@@ -597,6 +606,14 @@ plot_std_residuals(arma00egarch21)
 plot_std_sq_residuals(arma00egarch21)
 plot_conditional_sd(arma00egarch21)
 ```
+#### Comment
+
+- The significant omega, alpha1, alpha2, and beta1 terms indicate the presence of volatility clustering and persistence in volatility
+
+- The significant gamma1 term indicates the presence of asymmetry or leverage effects
+
+- No significant serial autocorrelation was observed 
+
 ### ARMA(0,0)-EGARCH(1, 2)
 
 ```{r}
@@ -611,7 +628,22 @@ plot_conditional_sd(arma00egarch12)
 ```
 ### Comment 
 
-tbd
+- The significant omega, alpha1, beta1, beta2, and gamma1 terms indicate the presence of volatility clustering and persistence in volatility
+
+- Ljung-Box and LM tests suggest no significant autocorrelation between residuals
+
+### ARMA(0,0)-EGARCH(1, 3)
+
+```{r}
+arma00egarch33 <- fit_garch(insample_r$r, 0, 0, 1, 3,model_type = "eGARCH")
+arma00egarch33
+```
+
+```{r}
+plot_std_residuals(arma00egarch33)
+plot_std_sq_residuals(arma00egarch33)
+plot_conditional_sd(arma00egarch33)
+```
 
 ## TGARCH Models
 
@@ -649,7 +681,7 @@ plot_std_residuals(arma00tgarch21)
 plot_std_sq_residuals(arma00tgarch21)
 plot_conditional_sd(arma00tgarch21)
 ```
-#### ARMA(0, 0) TGARCH(3, 3)
+#### ARMA(0, 0)- TGARCH(3, 3)
 ```{r}
 arma00tgarch33 <- fit_garch(insample_r$r, 1, 1, 3, 3,model_type = "fGARCH", submodel = "TGARCH")
 arma00tgarch33
@@ -661,6 +693,30 @@ plot_std_sq_residuals(arma00tgarch33)
 plot_conditional_sd(arma00tgarch33)
 ```
 #### Comment
+
+- AR(1), MA(1), ARCH(2) and GARCH (1) terms are significant
+
+- The significant eta11 term indicates asymmetric effects in the TGARCH model
+
+- Ljung-Box and LM tests show no serial autocorrelation, except for Lag(5) for LB on standardised residulas
+
+### ARMA(5, 5)-TGARCH(3, 3)
+
+```{r}
+arma55tgarch33 <- fit_garch(insample_r$r, 5, 5, 3, 3,model_type = "fGARCH", submodel = "TGARCH")
+arma55tgarch33
+```
+
+```{r}
+plot_std_residuals(arma55tgarch33)
+plot_std_sq_residuals(arma55tgarch33)
+plot_conditional_sd(arma55tgarch33)
+```
+#### Comment
+
+- AR(5), MA(5) are highly significant
+- AR(1), MA(1), MA(2), GARCH(1) terms as well as asymmetry terms for TGARCH(1,1) are significant
+-Ljung-Box and LM test show no serial autocorrelation between the residuals
 
 ## Model Selection
 
