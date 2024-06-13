@@ -14,6 +14,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo    = TRUE, 
+                      
                       cache   = TRUE,
                       message = FALSE, 
                       warning = FALSE)
@@ -21,15 +22,19 @@ options(scipen = 10)
 ```
 
 ```{r cache = F}
-library(tidyverse)
-library(xts)
-library(fBasics)
-library(tseries)
-library(car)
-library(FinTS)
-library(rugarch) 
-library(quantmod)
-library(hash)
+suppressMessages({
+  suppressWarnings({
+    library(tidyverse)
+    library(xts)
+    library(fBasics)
+    library(tseries)
+    library(car)
+    library(FinTS)
+    library(rugarch) 
+    library(quantmod)
+    library(hash)
+  })
+})
 ```
 
 - Everywhere here significance is assumed at p=0.05, if not said otherwise.
@@ -738,7 +743,7 @@ plot_std_residuals(arma55tgarch33)
 plot_std_sq_residuals(arma55tgarch33)
 plot_conditional_sd(arma55tgarch33)
 ```
-#### Comment
+
 
 
 ### ARMA(5,5)-TGARCH(1,2)
@@ -752,7 +757,6 @@ plot_std_residuals(arma55tgarch12)
 plot_std_sq_residuals(arma55tgarch12)
 plot_conditional_sd(arma55tgarch12)
 ```
-#### Comment
 
 ## Model Selection
 
@@ -770,38 +774,36 @@ infocriteria(arma00egarch33)
 infocriteria(arma55tgarch12)
 ```
 
-Based on the criteria above, ARMA(5,5)-TGARCH(1,2) has the lowest AIC, Shibata, and Hannan-Quinn values, and is 4th in BIC. Therefore, **ARMA(5,5)-TGARCH(1,2)** is the best choice among the tested models as it seems to provide the best balance between model fit and complexity.
+Based on the criteria above, ARMA(5,5)-TGARCH(1,2) has the lowest AIC, Shibata, and Hannan-Quinn values, and is 4th in BIC. However, **ARMA(0,0)-EGARCH(3,3)** will be chosen, because it is almost as good yet computationally easier.
 
 ```{r}
 chosen_garch = function(returns){
-  return(fit_garch(insample_r$r, 5, 5, 1, 2,model_type = "fGARCH", submodel = "TGARCH"))
+  return(fit_garch(insample_r$r, 0, 0, 3, 3,model_type = "eGARCH"))
 }
 ```
 
 # Futher Diagnostics
 
-## ARMA(5,5)-TGARCH(1,2)
+## ARMA(0,0)-EGARCH(3,3)
 
 Let's display the statistics of the model again.
 
 ```{r}
-arma55tgarch12
+arma00egarch33
 ```
 ### Parameters Discussion
 
-- Significant terms: AR (1, 3, 4, and 5), MA (1, 2, 3, 4, and 5)
-
 - omega - significant - constant term in the variance equation
 
-- alpha1 - significant- represents ARCH effect
+- alpha1, alpha 2, alpha3 - significant- represents ARCH effect
 
-- beta2 - significant - indicates a high persistence of volatility
+- gamma1, gamma2, gamma3- significant - indicates asymmetry in the effect of past shocks on volatility
 
-- eta11 - significant - represents the levarage effect
+- beta1, beta2, beta3 - significant - indicates a high persistence of volatility. The negative beta3 suggests some reversion in volatility
 
 
 ### Nyblom stability test
-Joint statistic below critical values = 2.6991 is below the critical value = 4.3 at 1% confidence interval. Hence we don't reject the null hypothesis. Individual statistics are also within range.
+Joint Statistic is 2.0872 (Critical Value at 5%: 2.75) and all individual statistics are below their respective critical values, indicating parameter stability.
 
 ### Ljung - Box and LM tests
 
@@ -809,23 +811,23 @@ No significant autocorrelation between residuals.
 
 ### Goodness-of-Fit Test
 
-Values suggest a good fit with significant p-values for different groups.
+The goodness-of-fit test indicates a good fit overall, though some groups show significant p-values (2-4), suggesting areas for potential improvement.
 
 ### News Impact Curve
 
 ```{r}
-plot_news_impact_curve(arma55tgarch12)
+plot_news_impact_curve(arma00egarch33)
 ```
 The news impact curve shows that lagged shock value impacts current conditional variance equally.
 
 ### Standardized residuals
 
 ```{r}
-plot_r_std_density(arma55tgarch12)
+plot_r_std_density(arma00egarch33)
 ```
 ```{r}
-std_residuals = (arma55tgarch12@fit$residuals 
-                 - mean(arma55tgarch12@fit$residuals)) / arma55tgarch12@fit$sigma
+std_residuals = (arma00egarch33@fit$residuals 
+                 - mean(arma00egarch33@fit$residuals)) / arma00egarch33@fit$sigma
 
 print(basicStats(std_residuals))
 print(jarque.bera.test(std_residuals))
@@ -902,7 +904,7 @@ VaR 5% breaches are in expected range.
 
 ## Out-of-sample
 
-```{r}
+```{r function}
 joined_returns$obs <- 1:length(joined_returns$r)
 outofsample_r <- joined_returns %>% filter(Date >= as.Date('2023-01-01'))
 
@@ -934,9 +936,14 @@ forecast_rolling_var = function(q_value, garch_func) {
 
 ### GARCH
 
-```{r}
+```{r forcast}
 vars <- forecast_rolling_var(0.01, chosen_garch)
 ```
+
+```{r}
+vars
+```
+
 ```{r}
 plot_var(outofsample_r$Date, outofsample_r$r, vars, ylims=c(-0.05, 0.05))
 var_losses(outofsample_r$r, vars)
