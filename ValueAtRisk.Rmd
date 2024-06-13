@@ -632,10 +632,10 @@ plot_conditional_sd(arma00egarch12)
 
 - Ljung-Box and LM tests suggest no significant autocorrelation between residuals
 
-### ARMA(0,0)-EGARCH(1, 3)
+### ARMA(0,0)-EGARCH(3, 3)
 
 ```{r}
-arma00egarch33 <- fit_garch(insample_r$r, 0, 0, 1, 3,model_type = "eGARCH")
+arma00egarch33 <- fit_garch(insample_r$r, 0, 0, 3, 3,model_type = "eGARCH")
 arma00egarch33
 ```
 
@@ -644,6 +644,15 @@ plot_std_residuals(arma00egarch33)
 plot_std_sq_residuals(arma00egarch33)
 plot_conditional_sd(arma00egarch33)
 ```
+#### Comment
+
+### ARMA(5,5)-EGARCH(3,3)
+
+```{r}
+arma55egarch33 <- fit_garch(insample_r$r, 5, 5, 3, 3,model_type = "eGARCH")
+arma55egarch33
+```
+
 
 ## TGARCH Models
 
@@ -657,7 +666,15 @@ plot_std_residuals(arma00tgarch11)
 plot_std_sq_residuals(arma00tgarch11)
 plot_conditional_sd(arma00tgarch11)
 ```
+#### Comment 
 
+- There are no signs of serial correlation in the residuals
+
+- The model stability test indicates that the model is stable
+
+- ARCH and GARCH components are highly significant
+
+### ARMA(0,0)-TGARCH(1,2)
 
 ```{r}
 arma00tgarch12 <- fit_garch(insample_r$r, 0, 0, 1, 2,model_type = "fGARCH", submodel = "TGARCH")
@@ -669,7 +686,15 @@ plot_std_residuals(arma00tgarch12)
 plot_std_sq_residuals(arma00tgarch12)
 plot_conditional_sd(arma00tgarch12)
 ```
-#### ARMA(0,0)-TGARCH(2,1)
+#### Comment
+
+- Omega, alpha1, beta2 and eta11 are significant
+
+- No serial correlation in residuals but some evidence of remaining ARCH effects
+
+
+
+### ARMA(0,0)-TGARCH(2,1)
 
 ```{r}
 arma00tgarch21 <- fit_garch(insample_r$r, 0, 0, 2,1,model_type = "fGARCH", submodel = "TGARCH")
@@ -681,9 +706,14 @@ plot_std_residuals(arma00tgarch21)
 plot_std_sq_residuals(arma00tgarch21)
 plot_conditional_sd(arma00tgarch21)
 ```
-#### ARMA(0, 0)- TGARCH(3, 3)
+#### Comment
+
+- beta1 highly significant confirming volatility persistance
+
+### ARMA(0, 0)-TGARCH(3, 3)
+
 ```{r}
-arma00tgarch33 <- fit_garch(insample_r$r, 1, 1, 3, 3,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch33 <- fit_garch(insample_r$r, 0, 0, 3, 3,model_type = "fGARCH", submodel = "TGARCH")
 arma00tgarch33
 ```
 
@@ -692,16 +722,7 @@ plot_std_residuals(arma00tgarch33)
 plot_std_sq_residuals(arma00tgarch33)
 plot_conditional_sd(arma00tgarch33)
 ```
-#### Comment
-
-- AR(1), MA(1), ARCH(2) and GARCH (1) terms are significant
-
-- The significant eta11 term indicates asymmetric effects in the TGARCH model
-
-- Ljung-Box and LM tests show no serial autocorrelation, except for Lag(5) for LB on standardised residulas
-
-### ARMA(5, 5)-TGARCH(3, 3)
-
+### ARMA(5, 5)- TGARCH(3, 3)
 ```{r}
 arma55tgarch33 <- fit_garch(insample_r$r, 5, 5, 3, 3,model_type = "fGARCH", submodel = "TGARCH")
 arma55tgarch33
@@ -714,9 +735,19 @@ plot_conditional_sd(arma55tgarch33)
 ```
 #### Comment
 
-- AR(5), MA(5) are highly significant
-- AR(1), MA(1), MA(2), GARCH(1) terms as well as asymmetry terms for TGARCH(1,1) are significant
--Ljung-Box and LM test show no serial autocorrelation between the residuals
+
+### ARMA(5,5)-TGARCH(1,2)
+```{r}
+arma55tgarch12 <- fit_garch(insample_r$r, 5, 5, 1, 2,model_type = "fGARCH", submodel = "TGARCH")
+arma55tgarch12
+```
+
+```{r}
+plot_std_residuals(arma55tgarch12)
+plot_std_sq_residuals(arma55tgarch12)
+plot_conditional_sd(arma55tgarch12)
+```
+#### Comment
 
 ## Model Selection
 
@@ -724,68 +755,72 @@ Since for most models LM and LB tests have not been able to reject null-hypothes
 
 These models are ARMA(0,0)-GARCH(2,1), ARMA(0,0)-GARCH(3,3) and ARMA(5,5)-GARCH(2,1).
 
+For other GARCH models we select ARMA(0,0)-EGARCH(3,3), ARMA(5,5)-EGARCH(3,3) and ARMA(5,5)-TGARCH(1,2)
 ```{r}
 infocriteria(arma00garch21)
 infocriteria(arma00garch33)
 infocriteria(arma55garch21)
+infocriteria(arma55egarch33)
+infocriteria(arma00egarch33)
+infocriteria(arma55tgarch12)
 ```
 
-If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the second best AIC and best BIC, ARMA(0,0)-GARCH(3,3) has the second best BIC but worst AIC, and ARMA(5,5)-GARCH(2,1) has best AIC but worst BIC. Based on this, it seems that the simpler **ARMA(0,0)-GARCH(2,1)** is better, hence we will proceed with it.
+Based on the criteria above, ARMA(5,5)-TGARCH(1,2) has the lowest AIC, Shibata, and Hannan-Quinn values, and is 4th in BIC. Therefore, **ARMA(5,5)-TGARCH(1,2)** is the best choice among the tested models as it seems to provide the best balance between model fit and complexity.
 
 ```{r}
 chosen_garch = function(returns){
-  return(fit_garch(returns, 0, 0, 2, 1))
+  return(fit_garch(insample_r$r, 5, 5, 1, 2,model_type = "fGARCH", submodel = "TGARCH"))
 }
 ```
 
 # Futher Diagnostics
 
-## ARMA(0,0)-GARCH(2,1)
+## ARMA(5,5)-TGARCH(1,2)
 
 Let's display the statistics of the model again.
 
 ```{r}
-arma00garch21
+arma55tgarch12
 ```
 ### Parameters Discussion
 
-As mentioned previously, ARCH(1) and ARCH(2) are insignificant.
+- Significant terms: AR (1, 3, 4, and 5), MA (1, 2, 3, 4, and 5)
 
-- Mu is an estimated mean of log-returns. It is close to zero, which is expected for log-returns.
-- Omega is an intercept of conditional variance equation. It is positive and very close to zero.
-- ARCH parameters are positive but small, indicating that lagged shocks somewhat influence the current conditional variance
-- GARCH(1) of 0.82 shows strong influence of lagged conditional variance.
+- omega - significant - constant term in the variance equation
 
+- alpha1 - significant- represents ARCH effect
 
+- beta2 - significant - indicates a high persistence of volatility
+
+- eta11 - significant - represents the levarage effect
 
 
 ### Nyblom stability test
+Joint statistic below critical values = 2.6991 is below the critical value = 4.3 at 1% confidence interval. Hence we don't reject the null hypothesis. Individual statistics are also within range.
 
-Regarding Nyblom stability test, we see that the joint stability statistic is large, 6.3395 > 1.47 at 5% confidence level. Hence we reject null hypothesis of joint parameter stability. Nevertheless, all individual statistics are smaller than 0.47, hence we cannot reject the null of individual parameter stability.
+### Ljung - Box and LM tests
 
-### Sign Bias Test
-
-Negative Sign Bias test rejects the null of no asymmetry. It means that the model reacts strongly on negative returns. The joint effect of biases is also significant.
+No significant autocorrelation between residuals.
 
 ### Goodness-of-Fit Test
 
-All p-values are small, suggesting that the model does not fit the data well in any grouping.
+Values suggest a good fit with significant p-values for different groups.
 
 ### News Impact Curve
 
 ```{r}
-plot_news_impact_curve(arma00garch21)
+plot_news_impact_curve(arma55tgarch12)
 ```
 The news impact curve shows that lagged shock value impacts current conditional variance equally.
 
 ### Standardized residuals
 
 ```{r}
-plot_r_std_density(arma00garch21)
+plot_r_std_density(arma55tgarch12)
 ```
 ```{r}
-std_residuals = (arma00garch21@fit$residuals 
-                 - mean(arma00garch21@fit$residuals)) / arma00garch21@fit$sigma
+std_residuals = (arma55tgarch12@fit$residuals 
+                 - mean(arma55tgarch12@fit$residuals)) / arma55tgarch12@fit$sigma
 
 print(basicStats(std_residuals))
 print(jarque.bera.test(std_residuals))
