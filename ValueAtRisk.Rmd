@@ -14,6 +14,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo    = TRUE, 
+                      
                       cache   = TRUE,
                       message = FALSE, 
                       warning = FALSE)
@@ -21,15 +22,19 @@ options(scipen = 10)
 ```
 
 ```{r cache = F}
-library(tidyverse)
-library(xts)
-library(fBasics)
-library(tseries)
-library(car)
-library(FinTS)
-library(rugarch) 
-library(quantmod)
-library(hash)
+suppressMessages({
+  suppressWarnings({
+    library(tidyverse)
+    library(xts)
+    library(fBasics)
+    library(tseries)
+    library(car)
+    library(FinTS)
+    library(rugarch) 
+    library(quantmod)
+    library(hash)
+  })
+})
 ```
 
 - Everywhere here significance is assumed at p=0.05, if not said otherwise.
@@ -287,24 +292,40 @@ We see more pronounced left tail and high kurtosis.
 
 The overall conclusion is that there are ARCH effects present in the log-returns of the portfolio.
 
-# Estimating GARCH models
+# Modelling
 
 ```{r}
 insample_r <- joined_returns %>% filter(Date < as.Date('2023-01-01'))
 ```
 
 ```{r}
-fit_garch = function(returns, arma_p, arma_q, arch_q, garch_p){
+fit_garch = function(returns, arma_p, arma_q, arch_q, garch_p, model_type = "sGARCH", submodel = NULL){
+
+  if(!is.null(submodel) && model_type == "fGARCH"){
+    variance_model = list(model = model_type,
+                          submodel = submodel,
+                          garchOrder = c(arch_q, garch_p))
+  } else {
+    variance_model = list(model = model_type,
+                          garchOrder = c(arch_q, garch_p))
+  }
+  
+  # Specify the GARCH model
   spec <- ugarchspec(
-    variance.model = list(model = "sGARCH",
-                          garchOrder = c(arch_q, garch_p)),
-    mean.model = list(armaOrder = c(arma_p, arma_q), include.mean = T),
+    variance.model = variance_model,
+    mean.model = list(armaOrder = c(arma_p, arma_q), include.mean = TRUE),
     distribution.model = "norm")
+  
+
   model <- ugarchfit(spec=spec, data=returns)
   return(model)
 }
 
 ```
+
+## Standard GARCH models
+
+Let's begin with fitting some standard GARCH models
 
 ### ARMA(0,0)-GARCH(1,1)
 
@@ -552,47 +573,44 @@ plot_conditional_sd(arma55garch35)
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. 
 - Model is rather complex, it isn't worth considering because of insignificant lags estimation.
 
+### EGARCH models
 
-## Model Selection
+In this part, we will try other types of GARCH models, with various parameters. Let's begin with EGARCH.
 
-Since for most models LM and LB tests have not been able to reject null-hypothesis of no standardized simple/squared residuals autocorrelation, and the 3rd ACF lag for standardized squared residuals has not been removed fully by each model as well, we decide to choose among models which are the simplest and/or have the largest number of significant coefficient estimations.
+### ARMA(0,0)-EGARCH(1,1)
 
-These models are ARMA(0,0)-GARCH(2,1), ARMA(0,0)-GARCH(3,3) and ARMA(5,5)-GARCH(2,1).
+
 
 ```{r}
-infocriteria(arma00garch21)
-infocriteria(arma00garch33)
-infocriteria(arma55garch21)
+arma00egarch11 <- fit_garch(insample_r$r, 0, 0, 1, 1,model_type = "eGARCH")
+arma00egarch11
 ```
 
-If we look at Akaike and Bayes criteria, ARMA(0,0)-GARCH(2,1) has the second best AIC and best BIC, ARMA(0,0)-GARCH(3,3) has the second best BIC but worst AIC, and ARMA(5,5)-GARCH(2,1) has best AIC but worst BIC. Based on this, it seems that the simpler **ARMA(0,0)-GARCH(2,1)** is better, hence we will proceed with it.
 
 ```{r}
-chosen_garch = function(returns){
-  return(fit_garch(returns, 0, 0, 2, 1))
-}
+plot_std_residuals(arma00egarch11)
+plot_std_sq_residuals(arma00egarch11)
+plot_conditional_sd(arma00egarch11)
 ```
+#### Comment
 
-## ARMA(0,0)-EGARCH(2,1)
+- Significant terms: omega, alpha1, beta1, gamma1
 
-Let's analyze the modification of the original model and see if it performs better.
+- The Ljung-Box tests for both residuals and squared residuals have high p-values, indicating no significant serial correlation or remaining ARCH effects, implying a well-fitted model
+
+- The ARCH LM test shows some significant ARCH effects at lower lags, suggesting there may still be some unmodeled volatility clustering
+
+- The model parameters indicate high persistence in conditional standard deviation (volatility), meaning that volatility shocks have a prolonged effect on future volatility.
+
+
+
+#### ARMA(0,0)-EGARCH(2, 1)
 
 ```{r}
-chosen_mod_garch = function(returns){
-  spec <- ugarchspec(variance.model = list(model = "eGARCH", 
-                                         garchOrder = c(2, 1)),
-                   mean.model = list(armaOrder = c(0, 0), 
-                                     include.mean = TRUE), 
-                   distribution.model = "norm") 
-  egarch_model <- ugarchfit(spec = spec, 
-                           data = returns)
-  return(egarch_model)
-}
-```
-```{r}
-arma00egarch21 <- chosen_mod_garch(insample_r$r)
+arma00egarch21 <- fit_garch(insample_r$r, 0, 0, 2, 1,model_type = "eGARCH")
 arma00egarch21
 ```
+
 ```{r}
 plot_std_residuals(arma00egarch21)
 plot_std_sq_residuals(arma00egarch21)
@@ -600,111 +618,284 @@ plot_conditional_sd(arma00egarch21)
 ```
 #### Comment
 
-- Only gamma2 is insignificant.
-- ACF of standardized residuals shows no autocorrelation.
-- ACF of squared standardized residuals has only one third significant lag.
-- Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject the null. 
+- The significant omega, alpha1, alpha2, and beta1 terms indicate the presence of volatility clustering and persistence in volatility
 
+- The significant gamma1 term indicates the presence of asymmetry or leverage effects
+
+- No significant serial autocorrelation was observed 
+
+### ARMA(0,0)-EGARCH(1, 2)
+
+```{r}
+arma00egarch12 <- fit_garch(insample_r$r, 0, 0, 1, 2,model_type = "eGARCH")
+arma00egarch12
+```
+
+```{r}
+plot_std_residuals(arma00egarch12)
+plot_std_sq_residuals(arma00egarch12)
+plot_conditional_sd(arma00egarch12)
+```
+### Comment 
+
+- The significant omega, alpha1, beta1, beta2, and gamma1 terms indicate the presence of volatility clustering and persistence in volatility
+
+- Ljung-Box and LM tests suggest no significant autocorrelation between residuals
+
+### ARMA(0,0)-EGARCH(3, 3)
+
+```{r}
+arma00egarch33 <- fit_garch(insample_r$r, 0, 0, 3, 3,model_type = "eGARCH")
+arma00egarch33
+```
+
+```{r}
+plot_std_residuals(arma00egarch33)
+plot_std_sq_residuals(arma00egarch33)
+plot_conditional_sd(arma00egarch33)
+```
+#### Comment
+
+### ARMA(5,5)-EGARCH(3,3)
+
+```{r}
+arma55egarch33 <- fit_garch(insample_r$r, 5, 5, 3, 3,model_type = "eGARCH")
+arma55egarch33
+```
+
+
+## TGARCH Models
+
+```{r}
+arma00tgarch11 <- fit_garch(insample_r$r, 0, 0, 1, 1,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch11
+```
+
+```{r}
+plot_std_residuals(arma00tgarch11)
+plot_std_sq_residuals(arma00tgarch11)
+plot_conditional_sd(arma00tgarch11)
+```
+#### Comment 
+
+- There are no signs of serial correlation in the residuals
+
+- The model stability test indicates that the model is stable
+
+- ARCH and GARCH components are highly significant
+
+### ARMA(0,0)-TGARCH(1,2)
+
+```{r}
+arma00tgarch12 <- fit_garch(insample_r$r, 0, 0, 1, 2,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch12
+```
+
+```{r}
+plot_std_residuals(arma00tgarch12)
+plot_std_sq_residuals(arma00tgarch12)
+plot_conditional_sd(arma00tgarch12)
+```
+#### Comment
+
+- Omega, alpha1, beta2 and eta11 are significant
+
+- No serial correlation in residuals but some evidence of remaining ARCH effects
+
+
+
+### ARMA(0,0)-TGARCH(2,1)
+
+```{r}
+arma00tgarch21 <- fit_garch(insample_r$r, 0, 0, 2,1,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch21
+```
+
+```{r}
+plot_std_residuals(arma00tgarch21)
+plot_std_sq_residuals(arma00tgarch21)
+plot_conditional_sd(arma00tgarch21)
+```
+#### Comment
+
+- beta1 highly significant confirming volatility persistance
+
+### ARMA(0, 0)-TGARCH(3, 3)
+
+```{r}
+arma00tgarch33 <- fit_garch(insample_r$r, 0, 0, 3, 3,model_type = "fGARCH", submodel = "TGARCH")
+arma00tgarch33
+```
+
+```{r}
+plot_std_residuals(arma00tgarch33)
+plot_std_sq_residuals(arma00tgarch33)
+plot_conditional_sd(arma00tgarch33)
+```
+### ARMA(5, 5)- TGARCH(3, 3)
+```{r}
+arma55tgarch33 <- fit_garch(insample_r$r, 5, 5, 3, 3,model_type = "fGARCH", submodel = "TGARCH")
+arma55tgarch33
+```
+
+```{r}
+plot_std_residuals(arma55tgarch33)
+plot_std_sq_residuals(arma55tgarch33)
+plot_conditional_sd(arma55tgarch33)
+```
+
+
+
+### ARMA(5,5)-TGARCH(1,2)
+```{r}
+arma55tgarch12 <- fit_garch(insample_r$r, 5, 5, 1, 2,model_type = "fGARCH", submodel = "TGARCH")
+arma55tgarch12
+```
+
+```{r}
+plot_std_residuals(arma55tgarch12)
+plot_std_sq_residuals(arma55tgarch12)
+plot_conditional_sd(arma55tgarch12)
+```
+
+## Model Selection
+
+Since for most models LM and LB tests have not been able to reject null-hypothesis of no standardized simple/squared residuals autocorrelation, and the 3rd ACF lag for standardized squared residuals has not been removed fully by each model as well, we decide to choose among models which are the simplest and/or have the largest number of significant coefficient estimations.
+
+These models are ARMA(0,0)-GARCH(2,1), ARMA(0,0)-GARCH(3,3) and ARMA(5,5)-GARCH(2,1).
+
+For other GARCH models we select ARMA(0,0)-EGARCH(3,3), ARMA(5,5)-EGARCH(3,3) and ARMA(5,5)-TGARCH(1,2)
+```{r}
+infocriteria(arma00garch21)
+infocriteria(arma00garch33)
+infocriteria(arma55garch21)
+infocriteria(arma55egarch33)
+infocriteria(arma00egarch33)
+infocriteria(arma55tgarch12)
+```
+
+Based on the criteria above, ARMA(5,5)-TGARCH(1,2) has the lowest AIC, Shibata, and Hannan-Quinn values, and is 4th in BIC. However, **ARMA(0,0)-EGARCH(3,3)** will be chosen, because it is almost as good yet computationally easier.
+
+```{r}
+chosen_garch = function(returns){
+  return(fit_garch(returns, 0, 0, 2, 1))
+}
+```
+
+```{r}
+chosen_mod_garch = function(returns){
+  spec <- ugarchspec(variance.model = list(model = "eGARCH", 
+                                         garchOrder = c(3, 3)),
+                   mean.model = list(armaOrder = c(0, 0), 
+                                     include.mean = TRUE), 
+                   distribution.model = "norm") 
+  egarch_model <- ugarchfit(spec = spec, 
+                           data = returns)
+  return(egarch_model)
+  
+}
+```
 
 # Futher Diagnostics
 
 ## ARMA(0,0)-GARCH(2,1)
 
-Let's display the statistics of the model again.
-
-```{r}
-arma00garch21
-```
-### Parameters Discussion
+#### PArameters 
 
 As mentioned previously, ARCH(1) and ARCH(2) are insignificant.
 
-- Mu is an estimated mean of log-returns. It is close to zero, which is expected for log-returns.
-- Omega is an intercept of conditional variance equation. It is positive and very close to zero.
-- ARCH parameters are positive but small, indicating that lagged shocks somewhat influence the current conditional variance
-- GARCH(1) of 0.82 shows strong influence of lagged conditional variance.
+Mu is an estimated mean of log-returns. It is close to zero, which is expected for log-returns.
+Omega is an intercept of conditional variance equation. It is positive and very close to zero.
+ARCH parameters are positive but small, indicating that lagged shocks somewhat influence the current conditional variance
+GARCH(1) of 0.82 shows strong influence of lagged conditional variance.
 
-
-
-
-### Nyblom stability test
+#### Nyblom Stability test
 
 Regarding Nyblom stability test, we see that the joint stability statistic is large, 6.3395 > 1.47 at 5% confidence level. Hence we reject null hypothesis of joint parameter stability. Nevertheless, all individual statistics are smaller than 0.47, hence we cannot reject the null of individual parameter stability.
 
-### Sign Bias Test
+#### Sign bias test
 
 Negative Sign Bias test rejects the null of no asymmetry. It means that the model reacts strongly on negative returns. The joint effect of biases is also significant.
 
-### Goodness-of-Fit Test
-
+#### Goodness-of-fit test
 All p-values are small, suggesting that the model does not fit the data well in any grouping.
 
-### News Impact Curve
+#### News impact curve
 
 ```{r}
 plot_news_impact_curve(arma00garch21)
 ```
-The news impact curve shows that lagged shock value impacts current conditional variance equally.
+
+shows that lagged shock value impacts current conditional variance equally.
 
 ### Standardized residuals
 
 ```{r}
 plot_r_std_density(arma00garch21)
 ```
+
 ```{r}
 std_residuals = (arma00garch21@fit$residuals 
                  - mean(arma00garch21@fit$residuals)) / arma00garch21@fit$sigma
+
+print(basicStats(std_residuals))
+```
+
+```{r}
+print(jarque.bera.test(std_residuals))
+```
+
+
+
+## ARMA(0,0)-EGARCH(3,3)
+
+Let's display the statistics of the model again.
+
+```{r}
+arma00egarch33
+```
+### Parameters Discussion
+
+- omega - significant - constant term in the variance equation
+
+- alpha1, alpha 2, alpha3 - significant- represents ARCH effect
+
+- gamma1, gamma2, gamma3- significant - indicates asymmetry in the effect of past shocks on volatility
+
+- beta1, beta2, beta3 - significant - indicates a high persistence of volatility. The negative beta3 suggests some reversion in volatility
+
+
+### Nyblom stability test
+Joint Statistic is 2.0872 (Critical Value at 5%: 2.75) and all individual statistics are below their respective critical values, indicating parameter stability.
+
+### Ljung - Box and LM tests
+
+No significant autocorrelation between residuals.
+
+### Goodness-of-Fit Test
+
+The goodness-of-fit test indicates a good fit overall, though some groups show significant p-values (2-4), suggesting areas for potential improvement.
+
+### News Impact Curve
+
+```{r}
+plot_news_impact_curve(arma00egarch33)
+```
+
+### Standardized residuals
+
+```{r}
+plot_r_std_density(arma00egarch33)
+```
+```{r}
+std_residuals = (arma00egarch33@fit$residuals 
+                 - mean(arma00egarch33@fit$residuals)) / arma00egarch33@fit$sigma
 
 print(basicStats(std_residuals))
 print(jarque.bera.test(std_residuals))
 ```
 
 The distribution of standardized residuals is platykurtic.
-
-## ARMA(0,0)-EGARCH(2,1)
-
-```{r}
-arma00egarch21
-```
-
-### Parameter Discussion
-
-- GARCH(1) is very large and highly significant. This means that previous conditional variance pretty much defines the current one.
-- Gamma captures the size effect, i.e. how much the influence of the $|z_{t-j}|-E|z_{t-j}|$ component is (according to the https://cran.r-project.org/web/packages/rugarch/vignettes/Introduction_to_the_rugarch_package.pdf). Here we see that it is positive, i.e. the father standardized residuals by abs. value are from their mean, the more is the level of conditional variance.
-
-### Nyblom Stability Test
-
-The test fails to reject the null of both joined and individual parameter stability (all statistics are smaller than 1.9).
-
-### Sign Bias Test
-
-We cannot reject the null of no asymmetry. Hence, the model should behave stably with both negative and positive returns.
-
-### Goodness-of-Fit Test
-
-All p-values are small, suggesting that the model does not fit the data well in any grouping.
-
-### News Impact Curve
-
-```{r}
-plot_news_impact_curve(arma00egarch21)
-```
-The news impact curve shows that negative lagged shock values impact current conditional variance much more than positive, which is a desirable effect for returns.
-
-### Standardized residuals
-
-```{r}
-plot_r_std_density(arma00egarch21)
-```
-```{r}
-std_residuals = (arma00egarch21@fit$residuals 
-                 - mean(arma00egarch21@fit$residuals)) / arma00egarch21@fit$sigma
-
-print(basicStats(std_residuals))
-print(jarque.bera.test(std_residuals))
-```
-
-The distribution of standardized residuals is still platykurtic.
 
 # Value-at-Risk
 
@@ -757,7 +948,7 @@ vars <- var_q * insample_garch@fit$sigma
 plot_var(insample_r$Date, insample_r$r, vars)
 ```
 
-In how many days do we breach the VaR quantile of `r threshold`?
+
 
 ```{r}
 var_losses(insample_r$r, vars)
@@ -773,36 +964,30 @@ var_losses(insample_r$r, vars)
 VaR 5% breaches are in expected range.
 
 ### EGARCH
-
-Calculate VAR from chosen EGARCH model.
-
 ```{r}
 insample_egarch <- chosen_mod_garch(insample_r$r)
 vars <- var_q * insample_egarch@fit$sigma
 ```
+
 ```{r}
 plot_var(insample_r$Date, insample_r$r, vars)
 ```
-
-In how many days do we breach the VaR quantile of `r threshold`?
-
 ```{r}
 var_losses(insample_r$r, vars)
 ```
-The result is acceptable. Let's test with VaR 5%.
 
 ```{r}
 vars <- get_var_quantile(insample_r$r, 0.05) * insample_egarch@fit$sigma
 plot_var(insample_r$Date, insample_r$r, vars)
+```
+```{r}
 var_losses(insample_r$r, vars)
 ```
-
-VaR 5% breaches are in expected range.
 
 
 ## Out-of-sample
 
-```{r}
+```{r function}
 joined_returns$obs <- 1:length(joined_returns$r)
 outofsample_r <- joined_returns %>% filter(Date >= as.Date('2023-01-01'))
 
@@ -817,6 +1002,7 @@ forecast_rolling_var = function(q_value, garch_func) {
   for(new_idx in start:finish){
      rolling_data <- joined_returns[joined_returns$obs <= new_idx-1, ]
      q <- get_var_quantile(rolling_data$r, q_value)
+     # print(paste("step:", new_idx))
      
      rolling_garch <- garch_func(rolling_data$r)
      forecast <- ugarchforecast(rolling_garch, n.ahead = 1)
@@ -833,9 +1019,14 @@ forecast_rolling_var = function(q_value, garch_func) {
 
 ### GARCH
 
-```{r}
+```{r forcast}
 vars <- forecast_rolling_var(0.01, chosen_garch)
 ```
+
+```{r}
+vars
+```
+
 ```{r}
 plot_var(outofsample_r$Date, outofsample_r$r, vars, ylims=c(-0.05, 0.05))
 var_losses(outofsample_r$r, vars)
@@ -847,8 +1038,13 @@ There are no return values breaching VaR 1%.
 ```{r}
 vars <- forecast_rolling_var(0.01, chosen_mod_garch)
 ```
+
 ```{r}
 plot_var(outofsample_r$Date, outofsample_r$r, vars, ylims=c(-0.05, 0.05))
+```
+
+
+```{r}
 var_losses(outofsample_r$r, vars)
 ```
-There are no return values breaching VaR 1%.
+
