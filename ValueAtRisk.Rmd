@@ -33,6 +33,8 @@ suppressMessages({
     library(rugarch) 
     library(quantmod)
     library(hash)
+    library(foreach)
+    library(doParallel)
   })
 })
 ```
@@ -950,17 +952,24 @@ finish  <- (joined_returns %>% filter(row_number() == n()))$obs
 forecast_rolling_var = function(q_value, garch_func) {
   vars <- rep(NA, times = finish - start + 1)
   
-  for(new_idx in start:finish){
+  n_cores = detectCores() - 1
+  cluster <- makeCluster(n_cores)
+  registerDoParallel(cluster)
+  
+  vars <- foreach(new_idx=start:finish,
+                  .export=c("joined_returns", "get_var_quantile", "fit_garch", 
+                            "ugarchspec", "ugarchfit", "ugarchforecast")) %dopar% {
      rolling_data <- joined_returns[joined_returns$obs <= new_idx-1, ]
      q <- get_var_quantile(rolling_data$r, q_value)
-     # print(paste("step:", new_idx))
-     
+
      rolling_garch <- garch_func(rolling_data$r)
      forecast <- ugarchforecast(rolling_garch, n.ahead = 1)
      sigma_for <- forecast@forecast$sigmaFor[1, 1]
      
-     vars[new_idx - start + 1] <- q * sigma_for
+     q * sigma_for
   }
+  
+  stopCluster(cluster)
   
   return(vars)
 }
@@ -972,10 +981,6 @@ forecast_rolling_var = function(q_value, garch_func) {
 
 ```{r}
 vars_garch <- forecast_rolling_var(0.01, chosen_garch)
-```
-
-```{r}
-vars_garch
 ```
 
 ```{r}
