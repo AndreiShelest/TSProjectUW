@@ -368,7 +368,7 @@ plot_conditional_sd(arma00garch11)
 #### Comment
 
 - All the estimates or parameters are significant. 
-- ACF of standardized residuals shows almost no autocorrelation
+- ACF of standardized residuals shows no autocorrelation
 - ACF of squared standardized residuals shows significant third lag.
 - Both Ljung-Box test for standardized squared residuals and LM tests say that we reject null-hypothesis of no autocorrelation of said residuals, hence the model is not adequate.
 
@@ -388,7 +388,7 @@ plot_conditional_sd(arma00garch21)
 #### Comment
 
 - ARCH(1) and ARCH(2) parameters are insignificant. 
-- ACF of standardized residuals shows almost no significant autocorrelation.
+- ACF of standardized residuals shows no autocorrelation.
 - ACF of squared standardized residuals shows significant third lag. It is smaller than in ARCH(0,0)-GARCH(1,1).
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
 
@@ -428,7 +428,7 @@ plot_conditional_sd(arma00garch22)
 #### Comment
 
 - ARCH(1), ARCH(2) and GARCH(2) parameters are not significant. GARCH(2) is close to zero. 
-- ACF of standardized residuals shows almost no autocorrelation.
+- ACF of standardized residuals shows no autocorrelation.
 - ACF of squared standardized residuals shows significant third lag.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
 
@@ -451,8 +451,8 @@ plot_conditional_sd(arma00garch33)
 #### Comment
 
 - ARCH(1) and GARCH(2) parameters are not significant. GARCH(2) is even estimated to be zero. 
-- ACF of standardized residuals shows almost no autocorrelation.
-- ACF of squared standardized residuals shows significant third lag, but its magnitude is the lowest as of now.
+- ACF of standardized residuals shows no autocorrelation.
+- ACF of squared standardized residuals shows significant third lag.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
 
 Perhaps, now we should move to altering mean equation to see the effects.
@@ -490,7 +490,7 @@ plot_conditional_sd(arma77garch21)
 
 #### Comment
 
-- AR(3), AR(4), MA(3), MA(4) lags are insignificant, as well as ARCH(2). 
+- AR(3), AR(4), MA(3), MA(4) lags are insignificant, as well as ARCH(1) and ARCH(2). 
 - ACF of standardized residuals confidently shows no autocorrelation.
 - ACF of squared standardized residuals shows significant third lag, as in all previous cases.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
@@ -512,7 +512,7 @@ plot_conditional_sd(arma55garch21)
 #### Comment
 
 - Only ARCH(2) is insignificant. 
-- ACF of standardized residuals shows one significant lag.
+- ACF of standardized residuals shows no significant lags.
 - ACF of squared standardized residuals shows significant third lag, as in all previous cases.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals.
 
@@ -532,8 +532,8 @@ plot_conditional_sd(arma55garch22)
 #### Comment
 
 - ARCH(2), GARCH(2) are insignificant. 
-- ACF of standardized residuals showed significant 9th lag.
-- ACF of squared standardized residuals shows significant third lag and 14th.
+- ACF of standardized residuals showed no significant lags.
+- ACF of squared standardized residuals shows significant third lag, 14th and 28th.
 - Both Ljung-Box test for standardized squared residuals and LM tests do not allow us to reject null-hypothesis of no autocorrelation of said residuals. Nevertheless, ACF plots are not great, and we can conclude that this model is not that good.
 
 
@@ -557,12 +557,9 @@ plot_conditional_sd(arma00egarch11)
 ```
 #### Comment
 
-- Significant terms: omega, alpha1, beta1, gamma1
-
+- All terms are significant
 - The Ljung-Box tests for both residuals and squared residuals have high p-values, indicating no significant serial correlation or remaining ARCH effects, implying a well-fitted model
-
 - The ARCH LM test shows some significant ARCH effects at lower lags, suggesting there may still be some unmodeled volatility clustering
-
 - The model parameters indicate high persistence in conditional standard deviation (volatility), meaning that volatility shocks have a prolonged effect on future volatility.
 
 
@@ -582,9 +579,7 @@ plot_conditional_sd(arma00egarch21)
 #### Comment
 
 - The significant omega, alpha1, alpha2, and beta1 terms indicate the presence of volatility clustering and persistence in volatility
-
 - The significant gamma1 term indicates the presence of asymmetry or leverage effects
-
 - No significant serial autocorrelation was observed 
 
 ### ARMA(0,0)-EGARCH(1,2)
@@ -602,8 +597,7 @@ plot_conditional_sd(arma00egarch12)
 #### Comment 
 
 - The significant omega, alpha1, beta1, beta2, and gamma1 terms indicate the presence of volatility clustering and persistence in volatility
-
-- Ljung-Box and LM tests suggest no significant autocorrelation between residuals
+- Ljung-Box and LM tests suggest no significant autocorrelation between squared standardized residuals
 
 
 ### ARMA(5,5)-EGARCH(2,1)
@@ -613,7 +607,16 @@ arma55egarch21 <- fit_garch(insample_r$r, 5, 5, 2, 1, model_type = "eGARCH")
 arma55egarch21
 ```
 
+```{r}
+plot_std_residuals(arma55egarch21)
+plot_std_sq_residuals(arma55egarch21)
+plot_conditional_sd(arma55egarch21)
+```
+
 #### Comment
+
+- Every parameter is significant, except for intercept omega.
+- No sign of autocorrelation in standardized residuals. There are some significant lags for squared standardized residuals, but the tests do not allow us to reject the null of no autocorrelation.
 
 ## TGARCH Models
 
@@ -631,10 +634,8 @@ plot_conditional_sd(arma00tgarch11)
 ```
 #### Comment 
 
-- There are no signs of serial correlation in the residuals
-
+- There are no signs of serial correlation in the squared standardized residuals according to tests (except LM lag 3).
 - The model stability test indicates that the model is stable
-
 - ARCH and GARCH components are highly significant
 
 ### ARMA(0,0)-TGARCH(1,2)
@@ -651,9 +652,8 @@ plot_conditional_sd(arma00tgarch12)
 ```
 #### Comment
 
-- Omega, alpha1, beta2 and eta11 are significant
-
-- No serial correlation in residuals but some evidence of remaining ARCH effects
+- GARCH(1) is insignificant
+- ACF plot of squared std. residuals shows two significant lags, LB test has 8th lag rejecting the null, but LM tests fail to reject the null.
 
 ### ARMA(0,0)-TGARCH(2,1)
 
@@ -669,7 +669,8 @@ plot_conditional_sd(arma00tgarch21)
 ```
 #### Comment
 
-- beta1 highly significant confirming volatility persistance
+- GARCH(1) is highly significant confirming volatility persistence.
+- The squared standardized residuals are not autocorellated (we fail to reject the null), according to the tests. 
 
 ### ARMA(5,5)-TGARCH(2,1)
 ```{r}
@@ -685,7 +686,11 @@ plot_conditional_sd(arma55tgarch21)
 
 #### Comment
 
+- Apart from alpha2 and eta12, every parameter is significant.
+- No sign of autocorrelation in standardized residuals. There are some significant lags for squared standardized residuals, but the tests do not allow us to reject the null of no autocorrelation.
+
 ### ARMA(5,5)-TGARCH(1,2)
+
 ```{r}
 arma55tgarch12 <- fit_garch(insample_r$r, 5, 5, 1, 2,model_type = "fGARCH", submodel = "TGARCH")
 arma55tgarch12
@@ -697,6 +702,9 @@ plot_std_sq_residuals(arma55tgarch12)
 plot_conditional_sd(arma55tgarch12)
 ```
 #### Comment
+
+- AR(2) and GARCH(1) are somehow insignificant.
+- No sign of autocorrelation in standardized residuals. There is one significant lag for squared standardized residuals, but the tests do not allow us to reject the null of no autocorrelation.
 
 ### Model Selection
 
@@ -940,7 +948,7 @@ var_losses(insample_r$r, vars)
 
 ## Out-of-sample
 
-```{r function}
+```{r}
 joined_returns$obs <- 1:length(joined_returns$r)
 outofsample_r <- joined_returns %>% filter(Date >= as.Date('2023-01-01'))
 
