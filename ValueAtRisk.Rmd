@@ -818,7 +818,7 @@ arma55egarch21
 - alpha values indicate presence of lagged error terms influence, albeit a mild one, because absolute values are somewhat small.
 - On the contrary, beta is very large, indicating strong influence of lagged volatility.
 - Regarding the asymmetry of reaction, according to the rugarch specification, the sign effect is captured by alpha. The alpha1 is negative and larger in absolute value than alpha2, therefore we conclude that negative shocks will have more impact on volatility than positive, at least for the first lag.
-- gamma values are positive. According to the rugarch specification, it indicates the influence of difference $|z_t|-E|z_t|$ (absolute standardized residuals), so it seems in this context it is desired for gamma to be positive (as opposed to the gamma from lecture 10).
+- gamma values are positive. According to the rugarch specification, it indicates the influence of difference $|z_t|-E|z_t|$ (absolute standardized residuals). It seems, in this context it is desired for gamma to be positive (as opposed to the gamma from lecture 10), because the larger the difference is, the greater the shock is in comparison to average, independently of sign.
 
 ### Nyblom stability test
 
@@ -905,13 +905,9 @@ Calculate VAR from chosen model.
 ```{r}
 insample_garch <- chosen_garch(insample_r$r)
 vars <- var_q * insample_garch@fit$sigma
-```
-```{r}
+
 plot_var(insample_r$Date, insample_r$r, vars)
-```
 
-
-```{r}
 var_losses(insample_r$r, vars)
 ```
 Worse than expected. Let's test with VaR 5%.
@@ -928,23 +924,35 @@ VaR 5% breaches are in expected range.
 ```{r}
 insample_egarch <- chosen_mod_garch(insample_r$r)
 vars <- var_q * insample_egarch@fit$sigma
-```
 
-```{r}
 plot_var(insample_r$Date, insample_r$r, vars)
-```
-```{r}
+
 var_losses(insample_r$r, vars)
 ```
+
+Better than simple GARCH, but still above 1% level.
 
 ```{r}
 vars <- get_var_quantile(insample_r$r, 0.05) * insample_egarch@fit$sigma
 plot_var(insample_r$Date, insample_r$r, vars)
-```
-```{r}
+
 var_losses(insample_r$r, vars)
 ```
 
+Here the results are OK.
+
+For the sake of comparison, let's try simpler model ARMA(0,0)-EGARCH(2,1).
+
+```{r}
+vars <- var_q * arma00egarch21@fit$sigma
+
+plot_var(insample_r$Date, insample_r$r, vars)
+
+var_losses(insample_r$r, vars)
+```
+Interestingly, it is even better on in-sample data, being exactly on 1% breach level.
+
+It seems, for VaR purposes ARCH(0,0)-EGARCH(2,1) may actually be better. But let us stick to the already chosen models.
 
 ## Out-of-sample
 
