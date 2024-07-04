@@ -103,7 +103,7 @@ plot_quotes = function(df, quote_col, title){
 }
 ```
 
-## Quotes and Returns
+## Prelimnary Analysis - Quotes and Returns
 
 
 ```{r}
@@ -555,12 +555,17 @@ plot_std_residuals(arma00egarch11)
 plot_std_sq_residuals(arma00egarch11)
 plot_conditional_sd(arma00egarch11)
 ```
+
+
 #### Comment
 
 - All terms are significant
+
 - The Ljung-Box tests for both residuals and squared residuals have high p-values, indicating no significant serial correlation or remaining ARCH effects, implying a well-fitted model
+
 - The ARCH LM test shows some significant ARCH effects at lower lags, suggesting there may still be some unmodeled volatility clustering
-- The model parameters indicate high persistence in conditional standard deviation (volatility), meaning that volatility shocks have a prolonged effect on future volatility.
+
+- The model parameters indicate high persistence in conditional standard deviation (volatility), meaning that volatility shocks have a prolonged effect on future volatility
 
 
 
@@ -576,11 +581,15 @@ plot_std_residuals(arma00egarch21)
 plot_std_sq_residuals(arma00egarch21)
 plot_conditional_sd(arma00egarch21)
 ```
+
 #### Comment
 
-- The significant omega, alpha1, alpha2, and beta1 terms indicate the presence of volatility clustering and persistence in volatility
-- The significant gamma1 term indicates the presence of asymmetry or leverage effects
-- No significant serial autocorrelation was observed 
+- No evidence of serial correlation in standardized residuals and squared standardized residuals, as indicated by the Ljung-Box tests
+
+- No significant ARCH effects in residuals, according to the LM ARCH test
+
+- The conditional variance dynamics are well-captured by the model parameters
+
 
 ### ARMA(0,0)-EGARCH(1,2)
 
@@ -594,10 +603,14 @@ plot_std_residuals(arma00egarch12)
 plot_std_sq_residuals(arma00egarch12)
 plot_conditional_sd(arma00egarch12)
 ```
+
 #### Comment 
 
-- The significant omega, alpha1, beta1, beta2, and gamma1 terms indicate the presence of volatility clustering and persistence in volatility
-- Ljung-Box and LM tests suggest no significant autocorrelation between squared standardized residuals
+- No evidence of serial correlation in standardized residuals and squared standardized residuals, as indicated by the Ljung-Box tests
+
+- No significant ARCH effects in residuals, according to the LM ARCH test
+
+- The conditional variance dynamics are well-captured by the model parameters
 
 
 ### ARMA(5,5)-EGARCH(2,1)
@@ -615,10 +628,15 @@ plot_conditional_sd(arma55egarch21)
 
 #### Comment
 
-- Every parameter is significant, except for intercept omega.
-- No sign of autocorrelation in standardized residuals. There are some significant lags for squared standardized residuals, but the tests do not allow us to reject the null of no autocorrelation.
+- No evidence of serial correlation in standardized residuals and squared standardized residuals, as indicated by the Ljung-Box tests
+
+- No significant ARCH effects in residuals, according to the LM ARCH test
+
+- The conditional variance dynamics are well-captured by the model parameters
 
 ## TGARCH Models
+
+Now, let's try some TGARCH models.
 
 ### ARMA(0,0)-TGARCH(1,1)
 
@@ -632,11 +650,14 @@ plot_std_residuals(arma00tgarch11)
 plot_std_sq_residuals(arma00tgarch11)
 plot_conditional_sd(arma00tgarch11)
 ```
+
 #### Comment 
 
-- There are no signs of serial correlation in the squared standardized residuals according to tests (except LM lag 3).
-- The model stability test indicates that the model is stable
-- ARCH and GARCH components are highly significant
+- No evidence of serial correlation in standardized residuals and squared standardized residuals, as indicated by the Ljung-Box tests
+
+- Some evidence of ARCH effects in residuals at lag 3, according to the LM ARCH test, suggesting potential remaining ARCH effects
+
+- The conditional variance dynamics are well-captured by the model parameters
 
 ### ARMA(0,0)-TGARCH(1,2)
 
@@ -650,10 +671,18 @@ plot_std_residuals(arma00tgarch12)
 plot_std_sq_residuals(arma00tgarch12)
 plot_conditional_sd(arma00tgarch12)
 ```
+
 #### Comment
 
-- GARCH(1) is insignificant
-- ACF plot of squared std. residuals shows two significant lags, LB test has 8th lag rejecting the null, but LM tests fail to reject the null.
+- No evidence of serial correlation in standardized residuals, as indicated by the Ljung-Box tests
+
+- Some evidence of autocorrelation in squared standardized residuals at certain lags, indicating potential remaining ARCH effects
+
+- No significant ARCH effects in residuals, according to the LM test
+
+- The conditional variance dynamics are well-captured by the model parameters
+
+- Stability and bias tests show no significant issues.
 
 ### ARMA(0,0)-TGARCH(2,1)
 
@@ -667,10 +696,16 @@ plot_std_residuals(arma00tgarch21)
 plot_std_sq_residuals(arma00tgarch21)
 plot_conditional_sd(arma00tgarch21)
 ```
+
 #### Comment
 
-- GARCH(1) is highly significant confirming volatility persistence.
-- The squared standardized residuals are not autocorellated (we fail to reject the null), according to the tests. 
+- No evidence of serial correlation in standardized residuals and squared standardized residuals, as indicated by the Ljung-Box tests.
+
+- No significant ARCH effects in residuals, according to the LM ARCH test.
+
+- The conditional variance dynamics are well-captured by the model parameters.
+
+- Stability and bias tests show no significant issues. 
 
 ### ARMA(5,5)-TGARCH(2,1)
 ```{r}
@@ -686,8 +721,14 @@ plot_conditional_sd(arma55tgarch21)
 
 #### Comment
 
-- Apart from alpha2 and eta12, every parameter is significant.
-- No sign of autocorrelation in standardized residuals. There are some significant lags for squared standardized residuals, but the tests do not allow us to reject the null of no autocorrelation.
+- No evidence of serial correlation in standardized residuals and squared standardized residuals, as indicated by the Ljung-Box tests
+
+- No significant ARCH effects in residuals, according to the LM ARCH test
+
+- The conditional variance dynamics are well-captured by the model parameters
+
+- Stability and bias tests show no significant issues.
+
 
 ### ARMA(5,5)-TGARCH(1,2)
 
@@ -701,10 +742,16 @@ plot_std_residuals(arma55tgarch12)
 plot_std_sq_residuals(arma55tgarch12)
 plot_conditional_sd(arma55tgarch12)
 ```
+
 #### Comment
 
-- AR(2) and GARCH(1) are somehow insignificant.
-- No sign of autocorrelation in standardized residuals. There is one significant lag for squared standardized residuals, but the tests do not allow us to reject the null of no autocorrelation.
+- No evidence of serial correlation in standardized residuals and squared standardized residuals, as indicated by the Ljung-Box tests
+
+- No significant ARCH effects in residuals, according to the LM ARCH test
+
+- The conditional variance dynamics are well-captured by the model parameters
+
+- Stability and bias tests show no significant issues.
 
 ### Model Selection
 
@@ -1018,3 +1065,7 @@ var_losses(outofsample_r$r, vars_egarch)
 ```
 
 There are no return values breaching VaR 1%.
+
+# Overall conclusion
+
+The final conclusion is that both standard GARCH and EGARCH both perform well when estimating VaR, with EGARCH being slightly better.
